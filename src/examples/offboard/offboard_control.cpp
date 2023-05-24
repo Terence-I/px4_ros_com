@@ -43,6 +43,7 @@
 #include <px4_msgs/msg/vehicle_command.hpp>
 #include <px4_msgs/msg/vehicle_control_mode.hpp>
 #include <rclcpp/rclcpp.hpp>
+#include <rclcpp/qos.hpp>
 #include <stdint.h>
 
 #include <chrono>
@@ -58,9 +59,14 @@ public:
 	OffboardControl() : Node("offboard_control")
 	{
 
-		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/fmu/in/offboard_control_mode", 10);
-		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/fmu/in/trajectory_setpoint", 10);
-		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/fmu/in/vehicle_command", 10);
+		rclcpp::QoS qos(rclcpp::KeepLast(10));
+		qos.best_effort();
+		//rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
+		//auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
+		//auto qos_pub = rclcpp::QoS(rclcpp::KeepLast(10));
+		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/px4_2/fmu/in/offboard_control_mode", qos);
+		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/px4_2/fmu/in/trajectory_setpoint", qos);
+		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/px4_2/fmu/in/vehicle_command", qos);
 
 		offboard_setpoint_counter_ = 0;
 
@@ -133,7 +139,7 @@ void OffboardControl::publish_offboard_control_mode()
 {
 	OffboardControlMode msg{};
 	msg.position = true;
-	msg.velocity = false;
+	msg.velocity = true;
 	msg.acceleration = false;
 	msg.attitude = false;
 	msg.body_rate = false;
@@ -149,8 +155,8 @@ void OffboardControl::publish_offboard_control_mode()
 void OffboardControl::publish_trajectory_setpoint()
 {
 	TrajectorySetpoint msg{};
-	msg.position = {0.0, 0.0, -5.0};
-	msg.yaw = -3.14; // [-PI:PI]
+	msg.position = {0.0, 0.0, -2.0};
+	msg.yaw = 3.14; // [-PI:PI]
 	msg.timestamp = this->get_clock()->now().nanoseconds() / 1000;
 	trajectory_setpoint_publisher_->publish(msg);
 }
@@ -167,7 +173,7 @@ void OffboardControl::publish_vehicle_command(uint16_t command, float param1, fl
 	msg.param1 = param1;
 	msg.param2 = param2;
 	msg.command = command;
-	msg.target_system = 1;
+	msg.target_system = 3;
 	msg.target_component = 1;
 	msg.source_system = 1;
 	msg.source_component = 1;

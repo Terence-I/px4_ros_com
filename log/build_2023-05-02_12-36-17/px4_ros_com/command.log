@@ -1,0 +1,2 @@
+Invoking command in '/home/terence/px4_ros2_ws/src/px4_ros_com/build/px4_ros_com': CMAKE_PREFIX_PATH=/opt/ros/foxy /usr/bin/cmake /home/terence/px4_ros2_ws/src/px4_ros_com -DCMAKE_INSTALL_PREFIX=/home/terence/px4_ros2_ws/src/px4_ros_com/install/px4_ros_com
+Invoked command in '/home/terence/px4_ros2_ws/src/px4_ros_com/build/px4_ros_com' returned '1': CMAKE_PREFIX_PATH=/opt/ros/foxy /usr/bin/cmake /home/terence/px4_ros2_ws/src/px4_ros_com -DCMAKE_INSTALL_PREFIX=/home/terence/px4_ros2_ws/src/px4_ros_com/install/px4_ros_com

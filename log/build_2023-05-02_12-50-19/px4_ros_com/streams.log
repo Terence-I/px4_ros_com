@@ -1,0 +1,29 @@
+[0.010s] Invoking command in '/home/terence/px4_ros2_ws/src/px4_ros_com/build/px4_ros_com': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/foxy /usr/bin/cmake /home/terence/px4_ros2_ws/src/px4_ros_com -DCMAKE_INSTALL_PREFIX=/home/terence/px4_ros2_ws/src/px4_ros_com/install/px4_ros_com
+[0.019s] -- Found ament_cmake: 0.9.11 (/opt/ros/foxy/share/ament_cmake/cmake)
+[0.034s] -- Using PYTHON_EXECUTABLE: /usr/bin/python3
+[0.147s] -- Found builtin_interfaces: 1.0.0 (/opt/ros/foxy/share/builtin_interfaces/cmake)
+[0.160s] -- Using all available rosidl_typesupport_c: rosidl_typesupport_fastrtps_c;rosidl_typesupport_introspection_c
+[0.162s] -- Found rosidl_adapter: 1.3.0 (/opt/ros/foxy/share/rosidl_adapter/cmake)
+[0.239s] -- Using all available rosidl_typesupport_cpp: rosidl_typesupport_fastrtps_cpp;rosidl_typesupport_introspection_cpp
+[0.255s] -- Found eigen3_cmake_module: 0.1.1 (/opt/ros/foxy/share/eigen3_cmake_module/cmake)
+[0.257s] -- Found geometry_msgs: 2.0.5 (/opt/ros/foxy/share/geometry_msgs/cmake)
+[0.304s] CMake Error at CMakeLists.txt:25 (find_package):
+[0.304s]   By not providing "Findpx4_msgs.cmake" in CMAKE_MODULE_PATH this project has
+[0.304s]   asked CMake to find a package configuration file provided by "px4_msgs",
+[0.304s]   but CMake did not find one.
+[0.304s] 
+[0.304s]   Could not find a package configuration file provided by "px4_msgs" with any
+[0.304s]   of the following names:
+[0.304s] 
+[0.304s]     px4_msgsConfig.cmake
+[0.304s]     px4_msgs-config.cmake
+[0.304s] 
+[0.304s]   Add the installation prefix of "px4_msgs" to CMAKE_PREFIX_PATH or set
+[0.304s]   "px4_msgs_DIR" to a directory containing one of the above files.  If
+[0.304s]   "px4_msgs" provides a separate development package or SDK, be sure it has
+[0.304s]   been installed.
+[0.304s] 
+[0.305s] 
+[0.305s] -- Configuring incomplete, errors occurred!
+[0.305s] See also "/home/terence/px4_ros2_ws/src/px4_ros_com/build/px4_ros_com/CMakeFiles/CMakeOutput.log".
+[0.308s] Invoked command in '/home/terence/px4_ros2_ws/src/px4_ros_com/build/px4_ros_com' returned '1': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/foxy /usr/bin/cmake /home/terence/px4_ros2_ws/src/px4_ros_com -DCMAKE_INSTALL_PREFIX=/home/terence/px4_ros2_ws/src/px4_ros_com/install/px4_ros_com

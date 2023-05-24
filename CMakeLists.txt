@@ -17,13 +17,17 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(ament_cmake_python REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(eigen3_cmake_module REQUIRED)
 find_package(Eigen3 REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(px4_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
 find_package(sensor_msgs REQUIRED)
+
+#ament_python_install_package(${PROJECT_NAME})
 
 #################
 # Setup targets #
@@ -60,6 +64,28 @@ add_executable(offboard_control src/examples/offboard/offboard_control.cpp)
 ament_target_dependencies(offboard_control rclcpp px4_msgs)
 install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
+# examples/offboard_py/offboard_control
+#add_executable(offboard_control_py src/examples/offboard_py/offboard_control.py)
+#ament_target_dependencies(offboard_control_py rclpy px4_msgs)
+#set_target_properties(offboard_control_py PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bin")
+#install(TARGETS offboard_control_py DESTINATION lib/${PROJECT_NAME})
+
+#installing pyhton executables
+ament_python_install_package(${PROJECT_NAME})
+install(PROGRAMS
+  src/examples/offboard_py/offboard_control.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  src/examples/fly_to_ugv/fly_to_ugv.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  src/examples/cost_matrix/cost_matrix.py
+  DESTINATION lib/${PROJECT_NAME}
+)
 
 ############
 # Install ##

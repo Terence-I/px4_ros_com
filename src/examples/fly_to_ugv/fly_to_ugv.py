@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
+
 """
 Python implementation of Offboard Control
-
 """
 
 
 import rclpy
 from rclpy.node import Node
 from rclpy.clock import Clock
+
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy, HistoryPolicy
 
 from nav_msgs.msg import Odometry
 import nav_msgs
@@ -27,15 +29,17 @@ class OffboardControl(Node):
         #some variables
         self.current_pose = None
         
+        qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=10)
+        
+        qos_profile_pub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=0)
+        
         self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
-                                                                        "/px4_2/fmu/in/offboard_control_mode", 10)
+                                                                        "/px4_2/fmu/in/offboard_control_mode", 3)
         self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
-                                                                    "/px4_2/fmu/in/trajectory_setpoint", 10)
-        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_2/fmu/in/vehicle_command", 10)
+                                                                    "/px4_2/fmu/in/trajectory_setpoint", 3)
+        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_2/fmu/in/vehicle_command", 3)
         
-        self.subscription = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 10)
-        
-        self.subscription  # prevent unused variable warning
+        self.subscription = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 3)
 
         self.offboard_setpoint_counter_ = 0
 
@@ -52,23 +56,10 @@ class OffboardControl(Node):
         # Offboard_control_mode needs to be paired with trajectory_setpoint
         self.publish_offboard_control_mode()
         self.publish_trajectory_setpoint()
-        #self.odometry_callback(Odometry)
 
         # stop the counter after reaching 11
         if (self.offboard_setpoint_counter_ < 11):
             self.offboard_setpoint_counter_ += 1
-            
-            
-        '''setpoint_msg = Odometry()
-        x = setpoint_msg.pose.pose.position.x
-        y = setpoint_msg.pose.pose.position.y
-        z = setpoint_msg.pose.pose.position.z'''
-        '''out_msg = TrajectorySetpoint()
-        out_msg.position = [self.current_pose.pose.pose.position.x, self.current_pose.pose.pose.position.y, self.current_pose.pose.pose.position.z]
-        out_msg.yaw = 3.14  # [-PI:PI]
-        out_msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
-        self.trajectory_setpoint_publisher_.publish(out_msg)'''
-        
 
     # Arm the vehicle
     def arm(self):
@@ -104,25 +95,15 @@ class OffboardControl(Node):
     def publish_trajectory_setpoint(self):
         msg = TrajectorySetpoint()
         #msg.timestamp = self.timestamp_
-        msg.position = [self.current_pose.pose.pose.position.x, self.current_pose.pose.pose.position.y, self.current_pose.pose.pose.position.z] 
-        msg.yaw = 3.14  # [-PI:PI]
+        msg.position = [self.current_pose.pose.pose.position.y + (-5.45), self.current_pose.pose.pose.position.x + (0.3), -2.0] 
+        msg.yaw = -3.14  # [-PI:PI]
         msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         self.trajectory_setpoint_publisher_.publish(msg)
-        
-     
+
     ''' setting up the UGV odometry topic subscriber callback, and publishing to the trajectory setpoint topic'''
     def odometry_callback(self, msg):
     	self.current_pose = msg
-    	'''x = msg.pose.pose.position.x
-    	y = msg.pose.pose.position.y
-    	z = msg.pose.pose.position.z
-    	out_msg = TrajectorySetpoint()
-    	out_msg.position = [x, y, z]
-    	out_msg.yaw = 3.14  # [-PI:PI]
-    	out_msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
-    	self.trajectory_setpoint_publisher_.publish(out_msg)'''
-
-
+    
     '''
     Publish vehicle commands
         command   Command code (matches VehicleCommand and MAVLink MAV_CMD codes)
