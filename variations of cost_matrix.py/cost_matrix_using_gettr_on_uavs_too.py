@@ -38,19 +38,19 @@ class OffboardControl(Node):
         self.uav_pose1 = None
         self.dist_matrix = np.zeros((2, 2), float)
         
-        qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=0)
+        qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
         
         qos_profile_pub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=0)
         
         self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
-                                                                        "/px4_2/fmu/in/offboard_control_mode", 0)
+                                                                        "/px4_2/fmu/in/offboard_control_mode", 1)
         '''self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
-                                                                    "/px4_2/fmu/in/trajectory_setpoint", 0)'''
-        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_2/fmu/in/vehicle_command", 0)
+                                                                    "/px4_2/fmu/in/trajectory_setpoint", 1)'''
+        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_2/fmu/in/vehicle_command", 1)
         
-        self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 0)
+        self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 1)
         
-        self.subscription2 = self.create_subscription(Odometry, '/robot_one/odom_robot_one', self.odometry_callback_one, 0)
+        self.subscription2 = self.create_subscription(Odometry, '/robot_one/odom_robot_one', self.odometry_callback_one, 1)
         
         self.subscription3 = self.create_subscription(VehicleLocalPosition, "/px4_1/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback1, qos_profile_sub)
         
@@ -115,53 +115,29 @@ class OffboardControl(Node):
     def iterate(self):
         for j in range(0, 2):
             for i in range(0, 2):
-            	if j == 0 and self.uav_pose0 is not None:
-            		#getting UAV position info
-            		xa = self.uav_pose0.x + (-3.15)
-            		ya = self.uav_pose0.y + 0.34
-            		za = 0.0
-            		
-            		print("xa:", xa, " ya:", ya, " za:", za)
-            		
-            		#getting UGV position info (changing from ENU to NED coordinate system as well)
-            		var_name = "ugv_pose" + str(i)
-            		xg = getattr(self, var_name).pose.pose.position.y
-            		yg = getattr(self, var_name).pose.pose.position.x
-            		zg = -1 * getattr(self, var_name).pose.pose.position.z
-            		
-            		print("xg:", xg, " yg:", yg, " zg:", zg)
-            		
-            		#calculating the distance
-            		dist = math.sqrt((xg-xa)**2 + (yg-ya)**2 + (zg-za)**2)
-            		self.dist_matrix[j][i] = dist
-            		#var_value = getattr(self, var_name)
-                	#self.dist_list.append(var_value)
-                	#self.dist_matrix[j][i] = getattr(self, var_name)
-            		
-            	elif j == 1 and self.uav_pose1 is not None:
-            		#getting UAV position info
-            		xa = self.uav_pose1.x + (-5.5)
-            		ya = self.uav_pose1.y + 0.3
-            		za = 0.0
-            		
-            		print("xa1:", xa, " ya1:", ya, " za1:", za)
-            		
-            		#getting UGV position info (changing from ENU to NED coordinate system as well)
-            		var_name = "ugv_pose" + str(i)
-            		xg = getattr(self, var_name).pose.pose.position.y
-            		yg = getattr(self, var_name).pose.pose.position.x
-            		zg = -1 * getattr(self, var_name).pose.pose.position.z
-            		
-            		print("xg1:", xg, " yg1:", yg, " zg1:", zg)
-            		
-            		#calculating the distance
-            		dist = math.sqrt((xg-xa)**2 + (yg-ya)**2 + (zg-za)**2)
-            		self.dist_matrix[j][i] = dist
-            		
-            	else:
-            		print("waiting for position info \n")
-            		#print("xa:", xa, " ya:", ya, " za:", za)
-                	
+            	#getting UAV position info
+            	var_name_uav = "uav_pose" + str(j)
+            	xa = getattr(self, var_name_uav).x
+            	ya = getattr(self, var_name_uav).y
+            	za = getattr(self, var_name_uav).z
+            	
+            	print("xa:", xa, " ya:", ya, " za:", za)
+            	
+            	#getting UGV position info (changing from ENU to NED coordinate system as well)
+            	var_name = "ugv_pose" + str(i)
+            	xg = getattr(self, var_name).pose.pose.position.y
+            	yg = getattr(self, var_name).pose.pose.position.x
+            	zg = -1 * getattr(self, var_name).pose.pose.position.z
+            	
+            	print("xg:", xg, " yg:", yg, " zg:", zg)
+            	
+            	#calculating the distance
+            	dist = math.sqrt((xg-xa)**2 + (yg-ya)**2 + (zg-za)**2)
+            	self.dist_matrix[j][i] = dist
+            	#var_value = getattr(self, var_name)
+            	#self.dist_list.append(var_value)
+            	#self.dist_matrix[j][i] = getattr(self, var_name)     	
+        	
         print("Cost adjacency matrix: \n")
         print(self.dist_matrix)
     '''
