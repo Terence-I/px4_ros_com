@@ -43,19 +43,19 @@ class OffboardControl(Node):
         
         self.k = 1
         self.var_name = "/px4_{}/fmu/out/vehicle_local_position".format(self.k)
-        self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.k)
-        self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.k)
-        self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.k)
+        self.offboard_mode_topics = None
+        self.trajectory_set_point_topics = None
+        self.vehicle_command_topics = None
         
         qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
         
         qos_profile_pub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=0)
         
-        self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
+        '''self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
                                                                         "/px4_1/fmu/in/offboard_control_mode", 1)
         self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
                                                                     "/px4_1/fmu/in/trajectory_setpoint", 1)
-        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_1/fmu/in/vehicle_command", 1)
+        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_1/fmu/in/vehicle_command", 1)'''
         
         self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 1)
         
@@ -182,8 +182,18 @@ class OffboardControl(Node):
             		self.close_pair = self.dist_matrix[a][b]
             		self.uav_to_serve = a + 1
             		self.ugv_to_be_served = b + 1
+            		
+            		self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.uav_to_serve)
+            		self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.uav_to_serve)
+            		self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)
         
-        print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served)    		
+        print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served)
+        
+        self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
+                                                                        self.offboard_mode_topics, 1)
+        self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
+                                                                    self.trajectory_set_point_topics, 1)
+        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, self.vehicle_command_topics, 1)    		
       
         
     '''
