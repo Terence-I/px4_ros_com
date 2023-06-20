@@ -64,9 +64,9 @@ public:
 		//rmw_qos_profile_t qos_profile = rmw_qos_profile_sensor_data;
 		//auto qos = rclcpp::QoS(rclcpp::QoSInitialization(qos_profile.history, 5), qos_profile);
 		//auto qos_pub = rclcpp::QoS(rclcpp::KeepLast(10));
-		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/px4_2/fmu/in/offboard_control_mode", qos);
-		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/px4_2/fmu/in/trajectory_setpoint", qos);
-		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/px4_2/fmu/in/vehicle_command", qos);
+		offboard_control_mode_publisher_ = this->create_publisher<OffboardControlMode>("/px4_1/fmu/in/offboard_control_mode", qos);
+		trajectory_setpoint_publisher_ = this->create_publisher<TrajectorySetpoint>("/px4_1/fmu/in/trajectory_setpoint", qos);
+		vehicle_command_publisher_ = this->create_publisher<VehicleCommand>("/px4_1/fmu/in/vehicle_command", qos);
 
 		offboard_setpoint_counter_ = 0;
 
@@ -173,7 +173,7 @@ void OffboardControl::publish_vehicle_command(uint16_t command, float param1, fl
 	msg.param1 = param1;
 	msg.param2 = param2;
 	msg.command = command;
-	msg.target_system = 3;
+	msg.target_system = 2;
 	msg.target_component = 1;
 	msg.source_system = 1;
 	msg.source_component = 1;

@@ -37,22 +37,31 @@ class OffboardControl(Node):
         self.uav_pose0 = None
         self.uav_pose1 = None
         self.dist_matrix = np.zeros((2, 2), float)
+        self.ugv_to_be_served = 0
+        self.uav_to_serve = 0
+        self.close_pair = 1000
         
-        qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=0)
+        self.k = 1
+        self.var_name = "/px4_{}/fmu/out/vehicle_local_position".format(self.k)
+        self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.k)
+        self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.k)
+        self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.k)
+        
+        qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
         
         qos_profile_pub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=0)
         
         self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
-                                                                        "/px4_2/fmu/in/offboard_control_mode", 0)
-        '''self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
-                                                                    "/px4_2/fmu/in/trajectory_setpoint", 0)'''
-        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_2/fmu/in/vehicle_command", 0)
+                                                                        "/px4_1/fmu/in/offboard_control_mode", 1)
+        self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
+                                                                    "/px4_1/fmu/in/trajectory_setpoint", 1)
+        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_1/fmu/in/vehicle_command", 1)
         
-        self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 0)
+        self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 1)
         
-        self.subscription2 = self.create_subscription(Odometry, '/robot_one/odom_robot_one', self.odometry_callback_one, 0)
+        self.subscription2 = self.create_subscription(Odometry, '/robot_one/odom_robot_one', self.odometry_callback_one, 1)
         
-        self.subscription3 = self.create_subscription(VehicleLocalPosition, "/px4_1/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback1, qos_profile_sub)
+        self.subscription3 = self.create_subscription(VehicleLocalPosition, self.var_name, self.TrajectorySetpoint_callback1, qos_profile_sub)
         
         self.subscription4 = self.create_subscription(VehicleLocalPosition, "/px4_2/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback2, qos_profile_sub)
 
@@ -83,9 +92,9 @@ class OffboardControl(Node):
             self.arm()
 
         # Offboard_control_mode needs to be paired with trajectory_setpoint
-        #self.publish_offboard_control_mode()
         self.iterate()
-        #self.publish_trajectory_setpoint()
+        self.publish_offboard_control_mode()
+        self.publish_trajectory_setpoint()
 
         # stop the counter after reaching 11
         if (self.offboard_setpoint_counter_ < 11):
@@ -162,8 +171,21 @@ class OffboardControl(Node):
             		print("waiting for position info \n")
             		#print("xa:", xa, " ya:", ya, " za:", za)
                 	
-        print("Cost adjacency matrix: \n")
+        print("\n Cost adjacency matrix:")
         print(self.dist_matrix)
+        
+        #loops below are for choosing the pair to be serviced based on how close their. this is just used to test how the final code will look like
+        for a in range(0, 2):
+            for b in range(0, 2):
+            	if self.dist_matrix[a][b] < self.close_pair:
+            		#finding the closest UAV-UGV pair and storing the pair's info
+            		self.close_pair = self.dist_matrix[a][b]
+            		self.uav_to_serve = a + 1
+            		self.ugv_to_be_served = b + 1
+        
+        print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served)    		
+      
+        
     '''
 	Publish the offboard control mode.
 	For this example, only position and altitude controls are active.
@@ -179,12 +201,21 @@ class OffboardControl(Node):
         msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         self.offboard_control_mode_publisher_.publish(msg)
         
+        
+    def publish_trajectory_setpoint(self):
+        msg = TrajectorySetpoint()
+        #msg.timestamp = self.timestamp_
+        msg.position = [self.ugv_pose0.pose.pose.position.y + (-5.45), self.ugv_pose0.pose.pose.position.x + (0.3), -2.0] 
+        msg.yaw = -3.14  # [-PI:PI]
+        msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
+        self.trajectory_setpoint_publisher_.publish(msg)
+        
     def publish_vehicle_command(self, command, param1=0.0, param2=0.0):
         msg = VehicleCommand()
         msg.param1 = param1
         msg.param2 = param2
         msg.command = command  # command ID
-        msg.target_system = 3  # system which should execute the command
+        msg.target_system = self.uav_to_serve + 1  # system which should execute the command
         msg.target_component = 1  # component which should execute the command, 0 for all components
         msg.source_system = 1  # system sending the command
         msg.source_component = 1  # component sending the command
