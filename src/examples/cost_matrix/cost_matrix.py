@@ -22,6 +22,7 @@ from px4_msgs.msg import VehicleControlMode
 from px4_msgs.msg import VehicleLocalPosition
 import math
 import numpy as np
+import time
 
 
 
@@ -40,6 +41,14 @@ class OffboardControl(Node):
         self.ugv_to_be_served = 0
         self.uav_to_serve = 0
         self.close_pair = 1000
+        
+        #ugv and uav position global variables (you must end up not using them, if you don't delete them)
+        self.xa =0.0
+        self.ya =0.0
+        self.za =0.0
+        self.xg =0.0
+        self.yg =0.0
+        self.zg =0.0
         
         self.k = 1
         self.var_name = "/px4_{}/fmu/out/vehicle_local_position".format(self.k)
@@ -95,6 +104,27 @@ class OffboardControl(Node):
         self.iterate()
         self.publish_offboard_control_mode()
         self.publish_trajectory_setpoint()
+        
+        #print("xa:", self.xa, " ya:", self.ya, " za:", self.za)
+        #print("xg:", self.xg, " yg:", self.yg, " zg:", self.zg)
+        
+        varg_name = "ugv_pose" + str(self.ugv_to_be_served - 1)
+        vara_name = "uav_pose" + str(self.uav_to_serve - 1)
+        xaa = getattr(self, vara_name).x
+        zaa = getattr(self, vara_name).z
+        xgg = getattr(self, varg_name).pose.pose.position.y
+        yaa = getattr(self, vara_name).y
+        ygg = getattr(self, varg_name).pose.pose.position.x
+        
+        print("xaa:", xaa, " zaa:", zaa, " xgg:", xgg, " yaa:", yaa, " ygg:", ygg)
+        
+        if abs(ygg - yaa)<=0.36 and round(zaa, 0) == -2.0:
+        	#self.publish_trajectory_setpoint()
+        	#self.publish_trajectory_setpoint()
+        	#time.sleep(1)
+        	self.return_to_base()
+        	time.sleep(6)
+        	self.disarm()
 
         # stop the counter after reaching 11
         if (self.offboard_setpoint_counter_ < 11):
@@ -126,22 +156,22 @@ class OffboardControl(Node):
             for i in range(0, 2):
             	if j == 0 and self.uav_pose0 is not None:
             		#getting UAV position info
-                    	xa = self.uav_pose0.x + (-3.15)
-                    	ya = self.uav_pose0.y + 0.34
-                    	za = 0.0
+                    	self.xa = self.uav_pose0.x + (-3.15)
+                    	self.ya = self.uav_pose0.y + 0.34
+                    	self.za = self.uav_pose0.z
 
-                    	print("xa:", xa, " ya:", ya, " za:", za)
+                    	print("xa:", self.xa, " ya:", self.ya, " za:", self.za)
 
                     	#getting UGV position info (changing from ENU to NED coordinate system as well)
                     	var_name = "ugv_pose" + str(i)
-                    	xg = getattr(self, var_name).pose.pose.position.y
-                    	yg = getattr(self, var_name).pose.pose.position.x
-                    	zg = -1 * getattr(self, var_name).pose.pose.position.z
+                    	self.xg = getattr(self, var_name).pose.pose.position.y
+                    	self.yg = getattr(self, var_name).pose.pose.position.x
+                    	self.zg = -1 * getattr(self, var_name).pose.pose.position.z
 
-                    	print("xg:", xg, " yg:", yg, " zg:", zg)
+                    	print("xg:", self.xg, " yg:", self.yg, " zg:", self.zg)
 
                     	#calculating the distance
-                    	dist = math.sqrt((xg-xa)**2 + (yg-ya)**2 + (zg-za)**2)
+                    	dist = math.sqrt((self.xg-self.xa)**2 + (self.yg-self.ya)**2 + (0.0-0.0)**2)
                     	self.dist_matrix[j][i] = dist
                     	#var_value = getattr(self, var_name)
                     	#self.dist_list.append(var_value)
@@ -150,22 +180,22 @@ class OffboardControl(Node):
             	
             	elif j == 1 and self.uav_pose1 is not None:
             		#getting UAV position info
-                    	xa = self.uav_pose1.x + (-5.5)
-                    	ya = self.uav_pose1.y + 0.3
-                    	za = 0.0
+                    	self.xa = self.uav_pose1.x + (-5.5)
+                    	self.ya = self.uav_pose1.y + 0.3
+                    	self.za = self.uav_pose1.z
 
-                    	print("xa1:", xa, " ya1:", ya, " za1:", za)
+                    	print("xa1:", self.xa, " ya1:", self.ya, " za1:", self.za)
 
                     	#getting UGV position info (changing from ENU to NED coordinate system as well)
                     	var_name = "ugv_pose" + str(i)
-                    	xg = getattr(self, var_name).pose.pose.position.y
-                    	yg = getattr(self, var_name).pose.pose.position.x
-                    	zg = -1 * getattr(self, var_name).pose.pose.position.z
+                    	self.xg = getattr(self, var_name).pose.pose.position.y
+                    	self.yg = getattr(self, var_name).pose.pose.position.x
+                    	self.zg = -1 * getattr(self, var_name).pose.pose.position.z
 
-                    	print("xg1:", xg, " yg1:", yg, " zg1:", zg)
+                    	print("xg1:", self.xg, " yg1:", self.yg, " zg1:", self.zg)
 
                     	#calculating the distance
-                    	dist = math.sqrt((xg-xa)**2 + (yg-ya)**2 + (zg-za)**2)
+                    	dist = math.sqrt((self.xg-self.xa)**2 + (self.yg-self.ya)**2 + (0.0-0.0)**2)
                     	self.dist_matrix[j][i] = dist
             	
             	
@@ -223,7 +253,7 @@ class OffboardControl(Node):
         x_offset = -1*(3.15+(self.uav_to_serve - 1)*2.35)
         
         if self.ugv_to_be_served == 1:
-        	msg.position = [self.ugv_pose0.pose.pose.position.y + x_offset, self.ugv_pose0.pose.pose.position.x + (0.3), -2.0]
+        	msg.position = [self.ugv_pose0.pose.pose.position.y + x_offset, self.ugv_pose0.pose.pose.position.x - 0.15, -2.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
@@ -233,6 +263,24 @@ class OffboardControl(Node):
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
+        	
+    def return_to_base(self):
+        msg = TrajectorySetpoint()
+        #msg.timestamp = self.timestamp_
+        x_offset = -1*(3.15+(self.uav_to_serve - 1)*2.35)
+        
+        if self.ugv_to_be_served == 1:
+        	msg.position = [-0.002299, -0.0419322, -1.0]
+        	msg.yaw = -3.14  # [-PI:PI]
+        	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
+        	self.trajectory_setpoint_publisher_.publish(msg)
+
+        elif self.ugv_to_be_served == 2:
+        	msg.position = [-0.002299, -0.0419322, -1.0]
+        	msg.yaw = -3.14  # [-PI:PI]
+        	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
+        	self.trajectory_setpoint_publisher_.publish(msg)    	
+    
         
     def publish_vehicle_command(self, command, param1=0.0, param2=0.0):
         msg = VehicleCommand()
