@@ -50,6 +50,11 @@ class OffboardControl(Node):
         self.yg =0.0
         self.zg =0.0
         
+        #variables to receive UGV coordinates
+        self.ugvx = 0.0
+        self.ugvy = 0.0
+        self.ugvz = 0.0
+        
         self.k = 1
         self.var_name = "/px4_{}/fmu/out/vehicle_local_position".format(self.k)
         self.offboard_mode_topics = None
@@ -118,12 +123,13 @@ class OffboardControl(Node):
         
         print("xaa:", xaa, " zaa:", zaa, " xgg:", xgg, " yaa:", yaa, " ygg:", ygg)
         
-        if abs(ygg - yaa)<=0.36 and round(zaa, 0) == -2.0:
+        if abs(ygg - yaa)<=0.25 and round(zaa, 0) == -2.0:
         	#self.publish_trajectory_setpoint()
         	#self.publish_trajectory_setpoint()
-        	#time.sleep(1)
+        	#self.refill()
+        	#time.sleep(2)
         	self.return_to_base()
-        	time.sleep(6)
+        	time.sleep(8)
         	self.disarm()
 
         # stop the counter after reaching 11
@@ -253,13 +259,17 @@ class OffboardControl(Node):
         x_offset = -1*(3.15+(self.uav_to_serve - 1)*2.35)
         
         if self.ugv_to_be_served == 1:
-        	msg.position = [self.ugv_pose0.pose.pose.position.y + x_offset, self.ugv_pose0.pose.pose.position.x - 0.15, -2.0]
+        	self.ugvx = self.ugv_pose0.pose.pose.position.y + x_offset
+        	self.ugvy = self.ugv_pose0.pose.pose.position.x - 0.15
+        	msg.position = [self.ugvx, self.ugvy, -2.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
 
         elif self.ugv_to_be_served == 2:
-        	msg.position = [self.ugv_pose1.pose.pose.position.y + x_offset, self.ugv_pose1.pose.pose.position.x + (0.3), -2.0]
+        	self.ugvx = self.ugv_pose1.pose.pose.position.y + x_offset
+        	self.ugvy = self.ugv_pose1.pose.pose.position.x - 0.15
+        	msg.position = [self.ugvx, self.ugvy, -2.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
@@ -279,7 +289,18 @@ class OffboardControl(Node):
         	msg.position = [-0.002299, -0.0419322, -1.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
-        	self.trajectory_setpoint_publisher_.publish(msg)    	
+        	self.trajectory_setpoint_publisher_.publish(msg)
+        	
+        	
+    '''def refill(self):
+    	msg = TrajectorySetpoint()
+    	#msg.timestamp = self.timestamp_
+    	x_offset = -1*(3.15+(self.uav_to_serve - 1)*2.35)
+    	msg.position = [self.ugvx, self.ugvy, -2.0]
+    	msg.yaw = -3.14  # [-PI:PI]
+    	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
+    	self.trajectory_setpoint_publisher_.publish(msg)
+    	time.sleep(2)'''
     
         
     def publish_vehicle_command(self, command, param1=0.0, param2=0.0):

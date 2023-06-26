@@ -87,6 +87,11 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  src/examples/ugv_planting_pattern/ugv_planting_pattern.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ############
 # Install ##
 ############
