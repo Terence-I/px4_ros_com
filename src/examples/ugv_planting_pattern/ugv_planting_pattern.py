@@ -114,7 +114,7 @@ class OffboardControl(Node):
         
         if self.ugv_pose0.pose.pose.position.x >= 5.0:
         	if yaw <= 3.14:
-        		msg.linear.x = 0.0  # Example value for the x component
+        		msg.linear.x = 0.02  # Example value for the x component
         		msg.linear.y = 0.0  # Example value for the y component
         		msg.linear.z = 0.0  # Example value for the z component
         		
@@ -131,9 +131,9 @@ class OffboardControl(Node):
         		msg.angular.y = 0.0  # Example value for the y component
         		msg.angular.z = 0.0  # Example value for the z component
         	
-        elif self.ugv_pose0.pose.pose.position.x <= -7.0:
-        	if yaw > 3.14 or yaw <= 0.0:
-        		msg.linear.x = 0.0  # Example value for the x component
+        elif self.ugv_pose0.pose.pose.position.x <= -5.0:
+        	if yaw >= 0.0:
+        		msg.linear.x = 0.02  # Example value for the x component
         		msg.linear.y = 0.0  # Example value for the y component
         		msg.linear.z = 0.0  # Example value for the z component
         		
