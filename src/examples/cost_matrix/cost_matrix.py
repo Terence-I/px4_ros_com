@@ -55,12 +55,14 @@ class OffboardControl(Node):
         self.ugvy = 0.0
         self.ugvz = 0.0
         
+        #variables to store names of the UAV topics
         self.k = 1
         self.var_name = "/px4_{}/fmu/out/vehicle_local_position".format(self.k)
         self.offboard_mode_topics = None
         self.trajectory_set_point_topics = None
         self.vehicle_command_topics = None
         
+        #Qos settings definitions for publishers and subscribers
         qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
         
         qos_profile_pub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=0)
@@ -71,6 +73,7 @@ class OffboardControl(Node):
                                                                     "/px4_1/fmu/in/trajectory_setpoint", 1)
         self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_1/fmu/in/vehicle_command", 1)'''
         
+        #subscribers to the UGVs and UAVs position topics
         self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 1)
         
         self.subscription2 = self.create_subscription(Odometry, '/robot_one/odom_robot_one', self.odometry_callback_one, 1)
@@ -113,6 +116,7 @@ class OffboardControl(Node):
         #print("xa:", self.xa, " ya:", self.ya, " za:", self.za)
         #print("xg:", self.xg, " yg:", self.yg, " zg:", self.zg)
         
+        #saving the UGV to be served and UAV to serve position info in variables
         varg_name = "ugv_pose" + str(self.ugv_to_be_served - 1)
         vara_name = "uav_pose" + str(self.uav_to_serve - 1)
         xaa = getattr(self, vara_name).x
@@ -123,6 +127,7 @@ class OffboardControl(Node):
         
         print("xaa:", xaa, " zaa:", zaa, " xgg:", xgg, " yaa:", yaa, " ygg:", ygg)
         
+        #condition for the UAV to fly back to the ground station after refilling
         if abs(ygg - yaa)<=0.25 and round(zaa, 0) == -2.0:
         	#self.publish_trajectory_setpoint()
         	#self.publish_trajectory_setpoint()
@@ -213,7 +218,7 @@ class OffboardControl(Node):
         print("\n Cost adjacency matrix:")
         print(self.dist_matrix)
         
-        #loops below are for choosing the pair to be serviced based on how close their. this is just used to test how the final code will look like
+        #loops below are for choosing the pair to be serviced based on how close they are. this is just used to test how the final code will look like, replace with digraph model
         for a in range(0, 2):
             for b in range(0, 2):
             	if self.dist_matrix[a][b] < self.close_pair:
@@ -252,7 +257,7 @@ class OffboardControl(Node):
         msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         self.offboard_control_mode_publisher_.publish(msg)
         
-        
+    # function for flying the chosen UAV to serve, to the UGV to be served    
     def publish_trajectory_setpoint(self):
         msg = TrajectorySetpoint()
         #msg.timestamp = self.timestamp_
@@ -273,7 +278,8 @@ class OffboardControl(Node):
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
-        	
+    
+    #function for the UAV to fly back to the ground station after serving    	
     def return_to_base(self):
         msg = TrajectorySetpoint()
         #msg.timestamp = self.timestamp_
@@ -286,7 +292,7 @@ class OffboardControl(Node):
         	self.trajectory_setpoint_publisher_.publish(msg)
 
         elif self.ugv_to_be_served == 2:
-        	msg.position = [-0.002299, -0.0419322, -1.0]
+        	msg.position = [-0.022299, -0.0419322, -1.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
@@ -302,7 +308,7 @@ class OffboardControl(Node):
     	self.trajectory_setpoint_publisher_.publish(msg)
     	time.sleep(2)'''
     
-        
+    #function to publish velocity command to the UAV    
     def publish_vehicle_command(self, command, param1=0.0, param2=0.0):
         msg = VehicleCommand()
         msg.param1 = param1
