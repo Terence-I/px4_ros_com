@@ -43,6 +43,7 @@ class OffboardControl(Node):
         #variables to store the UGV orientation
         self.ugv_orientation = None
         self.quaternion = None
+        self.ugv_position = None
       
         #Qos settings definitions for publishers and subscribers
         qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
@@ -50,9 +51,9 @@ class OffboardControl(Node):
         qos_profile_pub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=0)
         
         #creating publishers and subscribers
-        self.vehicle_command_pub_ = self.create_publisher(Twist, "/robot/cmd_robot", 10)
+        self.vehicle_command_pub_0 = self.create_publisher(Twist, "/robot/cmd_robot", 10)
         
-        self.vehicle_command_pub_one = self.create_publisher(Twist, "/robot_one/cmd_robot_one", 10)
+        self.vehicle_command_pub_1 = self.create_publisher(Twist, "/robot_one/cmd_robot_one", 10)
         
         self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 1)
         
@@ -97,84 +98,93 @@ class OffboardControl(Node):
     def timer_callback(self):
         # publish vehicle command
         self.publish_vehicle_command()
-        self.publish_vehicle_command_one()
+        #self.publish_vehicle_command_one()
         
     #function to publish UGV1 command velocity    
     def publish_vehicle_command(self):
-        msg = Twist()
-        msg.linear = Vector3()
-        msg.angular = Vector3()
-        
-        #getting the UGV orientation
-        self.ugv_orientation = self.ugv_pose0.pose.pose.orientation
-        self.quaternion = Quaternion()
-        self.quaternion.x = self.ugv_orientation.x
-        self.quaternion.y = self.ugv_orientation.y
-        self.quaternion.z = self.ugv_orientation.z
-        self.quaternion.w = self.ugv_orientation.w
-        
-        #converting UGV orientation from quaternion to euler
-        roll, pitch, yaw = self.euler_from_quaternion(self.quaternion.x, self.quaternion.y, self.quaternion.z, self.quaternion.w)
-        
-        #condition to turn at the end of the row
-        if self.ugv_pose0.pose.pose.position.x >= 5.0:
-        	if yaw <= 3.14:
-        		msg.linear.x = 0.02
-        		msg.linear.y = 0.0
-        		msg.linear.z = 0.0
+    	for i in range(0, 2):
+    		msg = Twist()
+    		msg.linear = Vector3()
+    		msg.angular = Vector3()
+    		
+    		ugv_pose_number = "ugv_pose" + str(i)
+    		
+    		#getting the UGV orientation
+    		self.ugv_orientation = getattr(self, ugv_pose_number).pose.pose.orientation
+    		self.ugv_position = getattr(self, ugv_pose_number).pose.pose.position
+    		
+    		self.quaternion = Quaternion()
+    		self.quaternion.x = self.ugv_orientation.x
+    		self.quaternion.y = self.ugv_orientation.y
+    		self.quaternion.z = self.ugv_orientation.z
+    		self.quaternion.w = self.ugv_orientation.w
+    		
+    		#converting UGV orientation from quaternion to euler
+    		roll, pitch, yaw = self.euler_from_quaternion(self.quaternion.x, self.quaternion.y, self.quaternion.z, self.quaternion.w)
+    		
+    		#condition to turn at the end of the row
+    		if self.ugv_position.x >= 5.0:
+    			if yaw <= 3.14:
+    				msg.linear.x = 0.02
+    				msg.linear.y = 0.0
+    				msg.linear.z = 0.0
+    				
+    				msg.angular.x = 0.0
+    				msg.angular.y = 0.0
+    				msg.angular.z = 2.0
+    			
+    			
+    			else:
+    				msg.linear.x = 0.5
+    				msg.linear.y = 0.0
+    				msg.linear.z = 0.0
+    				
+    				msg.angular.x = 0.0
+    				msg.angular.y = 0.0
+    				msg.angular.z = 0.0
+    		
+    		
+    		#condition to turn at the end of the row
+    		elif self.ugv_position.x <= -5.0:
+    			if yaw >= 0.0:
+    				msg.linear.x = 0.02
+    				msg.linear.y = 0.0
+    				msg.linear.z = 0.0
+    				
+    				msg.angular.x = 0.0
+    				msg.angular.y = 0.0
+    				msg.angular.z = -2.0
+    			
+    			else:
+        			msg.linear.x = 0.5
+        			msg.linear.y = 0.0
+        			msg.linear.z = 0.0
         		
-        		msg.angular.x = 0.0
-        		msg.angular.y = 0.0
-        		msg.angular.z = 2.0
-        		
-        	else:
-        		msg.linear.x = 0.5
-        		msg.linear.y = 0.0
-        		msg.linear.z = 0.0
-        		
-        		msg.angular.x = 0.0
-        		msg.angular.y = 0.0
-        		msg.angular.z = 0.0
-        
-        #condition to turn at the end of the row	
-        elif self.ugv_pose0.pose.pose.position.x <= -5.0:
-        	if yaw >= 0.0:
-        		msg.linear.x = 0.02
-        		msg.linear.y = 0.0
-        		msg.linear.z = 0.0
-        		
-        		msg.angular.x = 0.0
-        		msg.angular.y = 0.0
-        		msg.angular.z = -2.0
-        		
-        	else:
-        		msg.linear.x = 0.5
-        		msg.linear.y = 0.0
-        		msg.linear.z = 0.0
-        		
-        		msg.angular.x = 0.0
-        		msg.angular.y = 0.0
-        		msg.angular.z = 0.0
-        
-        #condition to move forward/plant	
-        else:
-        	msg.linear.x = 0.5
-        	msg.linear.y = 0.0
-        	msg.linear.z = 0.0
-        	
-        	msg.angular.x = 0.0
-        	msg.angular.y = 0.0
-        	msg.angular.z = 0.0
-
-        #msg.linear = [2.0, 0.0, 0.0]
-        #msg.angular = [0.0, 0.0, 0.0]
-        #msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
-        self.vehicle_command_pub_.publish(msg)
-        #print("x: ", self.quaternion.x, " y: ", self.quaternion.y, " z: ", self.quaternion.z, " w: ", self.quaternion.w)
-        print("\n yaw: ", yaw)
+        			msg.angular.x = 0.0
+        			msg.angular.y = 0.0
+        			msg.angular.z = 0.0
+    		
+    		
+    		#condition to move forward/plant
+    		else:
+    			msg.linear.x = 0.5
+    			msg.linear.y = 0.0
+    			msg.linear.z = 0.0
+    			msg.angular.x = 0.0
+    			msg.angular.y = 0.0
+    			msg.angular.z = 0.0
+    		
+    		#msg.linear = [2.0, 0.0, 0.0]
+    		#msg.angular = [0.0, 0.0, 0.0]
+    		#msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
+    		ugv_cmd_pub = "vehicle_command_pub_" + str(i)
+    		getattr(self, ugv_cmd_pub).publish(msg)
+    		#self.vehicle_command_pub_.publish(msg)
+    		#print("x: ", self.quaternion.x, " y: ", self.quaternion.y, " z: ", self.quaternion.z, " w: ", self.quaternion.w)
+    		print("\n yaw: ", yaw)
         
         
-    #function to publish UGV2 command velocity    
+    '''#function to publish UGV2 command velocity    
     def publish_vehicle_command_one(self):
         msg = Twist()
         msg.linear = Vector3()
@@ -246,7 +256,7 @@ class OffboardControl(Node):
         #msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         self.vehicle_command_pub_one.publish(msg)
         #print("x: ", self.quaternion.x, " y: ", self.quaternion.y, " z: ", self.quaternion.z, " w: ", self.quaternion.w)
-        print("\n yaw: ", yaw)
+        print("\n yaw: ", yaw)'''
 
 
 
