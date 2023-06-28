@@ -20,6 +20,8 @@ from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import VehicleControlMode
 from px4_msgs.msg import VehicleLocalPosition
+from px4_msgs.msg import VehicleStatus
+
 import math
 import numpy as np
 import time
@@ -37,10 +39,14 @@ class OffboardControl(Node):
         self.ugv_pose2 = None
         self.uav_pose0 = None
         self.uav_pose1 = None
+        self.uav_status0 = None #variable for storing UAV1 arming status
+        self.uav_status1 = None #variable for storing UAV2 arming status
+        
         self.dist_matrix = np.zeros((2, 2), float)
-        self.ugv_to_be_served = 0
-        self.uav_to_serve = 0
+        self.ugv_to_be_served = 1 #previously initialized to zero. change back if you get relevant errors
+        self.uav_to_serve = 1
         self.close_pair = 1000
+        self.iterate_flag = 0 #variable to check how many times we have run the iterate method (might not be necessary)
         
         #ugv and uav position global variables (you must end up not using them, if you don't delete them)
         self.xa =0.0
@@ -73,14 +79,18 @@ class OffboardControl(Node):
                                                                     "/px4_1/fmu/in/trajectory_setpoint", 1)
         self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_1/fmu/in/vehicle_command", 1)'''
         
-        #subscribers to the UGVs and UAVs position topics
-        self.subscription1 = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 1)
+        #subscribers to the UGVs and UAVs position and status topics
+        self.subscription1 = self.create_subscription(Odometry, '/robot_0/odom_robot_0', self.odometry_callback, 1)
         
-        self.subscription2 = self.create_subscription(Odometry, '/robot_one/odom_robot_one', self.odometry_callback_one, 1)
+        self.subscription2 = self.create_subscription(Odometry, '/robot_1/odom_robot_1', self.odometry_callback_one, 1)
         
         self.subscription3 = self.create_subscription(VehicleLocalPosition, self.var_name, self.TrajectorySetpoint_callback1, qos_profile_sub)
         
         self.subscription4 = self.create_subscription(VehicleLocalPosition, "/px4_2/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback2, qos_profile_sub)
+        
+        self.subscription5 = self.create_subscription(VehicleStatus, "/px4_1/fmu/out/vehicle_status", self.VehicleStatus_callback1, qos_profile_sub)
+        
+        self.subscription6 = self.create_subscription(VehicleStatus, "/px4_2/fmu/out/vehicle_status", self.VehicleStatus_callback2, qos_profile_sub)
 
         self.offboard_setpoint_counter_ = 0
 
@@ -100,6 +110,11 @@ class OffboardControl(Node):
     def TrajectorySetpoint_callback2(self, msg):
         self.uav_pose1 = msg
     
+    def VehicleStatus_callback1(self, msg):
+        self.uav_status0 = msg
+    
+    def VehicleStatus_callback2(self, msg):
+        self.uav_status1 = msg
     
     def timer_callback(self):
         if (self.offboard_setpoint_counter_ == 10):
@@ -108,10 +123,32 @@ class OffboardControl(Node):
             # Arm the vehicle
             self.arm()
 
-        # Offboard_control_mode needs to be paired with trajectory_setpoint
+        '''# Offboard_control_mode needs to be paired with trajectory_setpoint
         self.iterate()
+        self.arm()
         self.publish_offboard_control_mode()
-        self.publish_trajectory_setpoint()
+        self.publish_trajectory_setpoint()'''
+        
+        #conditions to check whether UAVs are armed, and then decide functions to call accordingly for a smooth simulation outcome
+        if self.uav_status0 is not None and self.uav_status1 is not None:
+        	if self.uav_status0.arming_state == 1 and self.uav_status1.arming_state == 1:
+        		self.iterate()
+        		self.arm()
+        		self.publish_offboard_control_mode()
+        		self.publish_trajectory_setpoint()
+        		print("UAV1 arming state: ", self.uav_status0.arming_state, " UAV2 arming state: ", self.uav_status1.arming_state, " \n")
+        		print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served, "\n")
+        		print(self.dist_matrix, "\n")
+        
+        	elif self.uav_status0.arming_state != 1 or self.uav_status1.arming_state != 1:
+        		#self.arm()
+        		self.publish_offboard_control_mode()
+        		self.publish_trajectory_setpoint()
+        		self.iterate_flag = 0
+        		print("UAV1 arming state: ", self.uav_status0.arming_state, " UAV2 arming state: ", self.uav_status1.arming_state, " \n")
+        		print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served, "\n")
+        		print(self.dist_matrix, "\n")
+        	
         
         #print("xa:", self.xa, " ya:", self.ya, " za:", self.za)
         #print("xg:", self.xg, " yg:", self.yg, " zg:", self.zg)
@@ -136,7 +173,7 @@ class OffboardControl(Node):
         	self.return_to_base()
         	time.sleep(8)
         	self.disarm()
-
+        
         # stop the counter after reaching 11
         if (self.offboard_setpoint_counter_ < 11):
             self.offboard_setpoint_counter_ += 1
@@ -153,16 +190,11 @@ class OffboardControl(Node):
 
     	
     
-    
-    '''def iterate(self):
-        if self.uav_pose0 is not None:
-            xa = self.uav_pose0.x
-            print(xa)
-        else:
-            print("Waiting for uav_pose0 to be updated...")'''
             
     #The function to derive and store the cost adjacency matrix
     def iterate(self):
+        
+        self.iterate_flag = self.iterate_flag + 1
         for j in range(0, 2):
             for i in range(0, 2):
             	if j == 0 and self.uav_pose0 is not None:
@@ -219,9 +251,23 @@ class OffboardControl(Node):
         print(self.dist_matrix)
         
         #loops below are for choosing the pair to be serviced based on how close they are. this is just used to test how the final code will look like, replace with digraph model
+        
         for a in range(0, 2):
             for b in range(0, 2):
-            	if self.dist_matrix[a][b] < self.close_pair:
+            	shortest_distance = np.min(self.dist_matrix)
+            	min_indices = np.argwhere(self.dist_matrix == shortest_distance)
+            	min_row, min_col = min_indices[0]  # Extract row and column indices
+            	
+            	self.uav_to_serve = int(min_row + 1)
+            	self.ugv_to_be_served = int(min_col + 1)
+            	
+            	self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.uav_to_serve)
+            	self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.uav_to_serve)
+            	self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)
+            
+            
+            
+            	'''if self.dist_matrix[a][b] < self.close_pair:
             		#finding the closest UAV-UGV pair and storing the pair's info
                     	self.close_pair = self.dist_matrix[a][b]
                     	self.uav_to_serve = a + 1
@@ -229,7 +275,7 @@ class OffboardControl(Node):
 
                     	self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.uav_to_serve)
                     	self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.uav_to_serve)
-                    	self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)
+                    	self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)'''
         
         print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served)
         
