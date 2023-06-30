@@ -22,6 +22,8 @@ from px4_msgs.msg import TrajectorySetpoint
 from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import VehicleControlMode
 from px4_msgs.msg import VehicleLocalPosition
+
+from std_msgs.msg import Int16
 import math
 import numpy as np
 import time
@@ -40,10 +42,17 @@ class OffboardControl(Node):
         self.ugv_pose0 = None
         self.ugv_pose1 = None
         
+        #seed level calculation variables
+        self.start_time = time.time()
+        self.end_time = None
+        self.duration = None
+        
         #variables to store the UGV orientation
         self.ugv_orientation = None
         self.quaternion = None
         self.ugv_position = None
+        
+        self.ugvs = 2 #number of UGVs
       
         #Qos settings definitions for publishers and subscribers
         qos_profile_sub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.VOLATILE, history=HistoryPolicy.KEEP_LAST, depth=1)
@@ -54,6 +63,8 @@ class OffboardControl(Node):
         #self.vehicle_command_pub_0 = self.create_publisher(Twist, "/robot/cmd_robot", 10)
         
         #self.vehicle_command_pub_1 = self.create_publisher(Twist, "/robot_one/cmd_robot_one", 10)
+        
+        self.seed_level_publisher = self.create_publisher(Int16, 'int16_topic', 10)
         
         self.subscription1 = self.create_subscription(Odometry, '/robot_0/odom_robot_0', self.odometry_callback, 1)
         
@@ -100,12 +111,19 @@ class OffboardControl(Node):
         self.publish_vehicle_command()
         #self.publish_vehicle_command_one()
         
+    def seed_level(self):
+    	self.start_time = time.time()
+    	self.end_time = time.time()
+    	self.duration = self.end_time - self.start_time
+    
     #function to publish UGV1 command velocity    
     def publish_vehicle_command(self):
-    	for i in range(0, 2):
+    	for i in range(0, self.ugvs):
     		msg = Twist()
     		msg.linear = Vector3()
     		msg.angular = Vector3()
+    		
+    		seed_level_msg = Int16()
     		
     		ugv_pose_number = "ugv_pose" + str(i)
     		
@@ -186,6 +204,22 @@ class OffboardControl(Node):
     		self.vehicle_command_pub_.publish(msg) #publishing the velocity commands
     		#print("x: ", self.quaternion.x, " y: ", self.quaternion.y, " z: ", self.quaternion.z, " w: ", self.quaternion.w)
     		print("\n yaw: ", yaw)
+    		
+    		self.end_time = time.time()
+    		self.duration = self.end_time - self.start_time
+    		print("\n The script has been running for", self.duration, "seconds.")
+    		if self.duration >= (10 + (i*20)) and self.duration < (10 + ((i+1)*20)):
+    			print("\n UGV", i+1, " needs serving.")
+    			seed_level_msg.data = i+1
+    			self.seed_level_publisher.publish(seed_level_msg)
+    			#I need to add a UGVi_served boolean flag in this condition so that we won't keep saying that UGV1 needs serving everytime duration>10
+    		elif self.duration < 10 or self.duration >= (10 + ((self.ugvs)*20)):
+    			seed_level_msg.data = 0
+    			self.seed_level_publisher.publish(seed_level_msg)
+    		
+    		if self.duration >= (20 + (self.ugvs*20)):
+    			self.start_time = time.time()
+    			print("\n The script has been running for", self.duration, "seconds.")
         
 
 

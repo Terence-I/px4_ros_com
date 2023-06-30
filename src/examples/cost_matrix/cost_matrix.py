@@ -22,6 +22,8 @@ from px4_msgs.msg import VehicleControlMode
 from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleStatus
 
+from std_msgs.msg import Int16
+
 import math
 import numpy as np
 import time
@@ -41,6 +43,7 @@ class OffboardControl(Node):
         self.uav_pose1 = None
         self.uav_status0 = None #variable for storing UAV1 arming status
         self.uav_status1 = None #variable for storing UAV2 arming status
+        self.ugv_seed_level = 0 #variable to receive the info of the UGV that needs to be served
         
         self.dist_matrix = np.zeros((2, 2), float)
         self.ugv_to_be_served = 1 #previously initialized to zero. change back if you get relevant errors
@@ -91,6 +94,8 @@ class OffboardControl(Node):
         self.subscription5 = self.create_subscription(VehicleStatus, "/px4_1/fmu/out/vehicle_status", self.VehicleStatus_callback1, qos_profile_sub)
         
         self.subscription6 = self.create_subscription(VehicleStatus, "/px4_2/fmu/out/vehicle_status", self.VehicleStatus_callback2, qos_profile_sub)
+        
+        self.subscription7 = self.create_subscription(Int16, '/int16_topic', self.seed_level_callback, 1) #subscriber for to the topic that publishes the UGV that needs to be served
 
         self.offboard_setpoint_counter_ = 0
 
@@ -116,6 +121,9 @@ class OffboardControl(Node):
     def VehicleStatus_callback2(self, msg):
         self.uav_status1 = msg
     
+    def seed_level_callback(self, msg):
+        self.ugv_seed_level = msg
+    
     def timer_callback(self):
         if (self.offboard_setpoint_counter_ == 10):
             # Change to Offboard mode after 10 setpoints
@@ -129,9 +137,23 @@ class OffboardControl(Node):
         self.publish_offboard_control_mode()
         self.publish_trajectory_setpoint()'''
         
-        #conditions to check whether UAVs are armed, and then decide functions to call accordingly for a smooth simulation outcome
-        if self.uav_status0 is not None and self.uav_status1 is not None:
-        	if self.uav_status0.arming_state == 1 and self.uav_status1.arming_state == 1:
+        
+        #condition to check whether there is a UGV that needs to be served (when no UGV needs to be served) and/or UAVs are armed to decide which functions to call accordingly for a smooth simulation outcome
+        if self.uav_status0 is not None and self.uav_status1 is not None and self.ugv_seed_level.data == 0:
+        	if self.uav_status0.arming_state == 1 and self.uav_status1.arming_state == 1: #if both UAVs are disarmed proceed
+        		print("\n No UGV needs serving because our data is: ", self.ugv_seed_level.data)
+        	
+        	elif self.uav_status0.arming_state != 1 or self.uav_status1.arming_state != 1: #if one UAV is armed wait for it to fininsh mission first
+        		self.publish_offboard_control_mode()
+        		self.publish_trajectory_setpoint()
+        		self.iterate_flag = 0
+        		print("UAV1 arming state: ", self.uav_status0.arming_state, " UAV2 arming state: ", self.uav_status1.arming_state, " \n")
+        		print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served, "\n")
+        		print(self.dist_matrix, "\n")
+        
+        #condition to check whether there is a UGV that needs to be served (when at least one UGV needs to be served) and/or UAVs are armed to decide which functions to call accordingly for a smooth simulation outcome
+        if self.uav_status0 is not None and self.uav_status1 is not None and self.ugv_seed_level.data != 0:
+        	if self.uav_status0.arming_state == 1 and self.uav_status1.arming_state == 1: #if both UAVs are disarmed proceed
         		self.iterate()
         		self.arm()
         		self.publish_offboard_control_mode()
@@ -140,7 +162,7 @@ class OffboardControl(Node):
         		print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served, "\n")
         		print(self.dist_matrix, "\n")
         
-        	elif self.uav_status0.arming_state != 1 or self.uav_status1.arming_state != 1:
+        	elif self.uav_status0.arming_state != 1 or self.uav_status1.arming_state != 1: #if one UAV is armed, do not iterate again wait for it to fininsh mission first
         		#self.arm()
         		self.publish_offboard_control_mode()
         		self.publish_trajectory_setpoint()
@@ -237,7 +259,7 @@ class OffboardControl(Node):
 
                     	print("xg1:", self.xg, " yg1:", self.yg, " zg1:", self.zg)
 
-                    	#calculating the distance
+                    	#calculating the distance and storing in the matrix
                     	dist = math.sqrt((self.xg-self.xa)**2 + (self.yg-self.ya)**2 + (0.0-0.0)**2)
                     	self.dist_matrix[j][i] = dist
             	
@@ -252,30 +274,21 @@ class OffboardControl(Node):
         
         #loops below are for choosing the pair to be serviced based on how close they are. this is just used to test how the final code will look like, replace with digraph model
         
+        self.ugv_to_be_served = self.ugv_seed_level.data #saving the UGV that needs serving from the seed_level topic
+        
         for a in range(0, 2):
-            for b in range(0, 2):
-            	shortest_distance = np.min(self.dist_matrix)
-            	min_indices = np.argwhere(self.dist_matrix == shortest_distance)
-            	min_row, min_col = min_indices[0]  # Extract row and column indices
-            	
-            	self.uav_to_serve = int(min_row + 1)
-            	self.ugv_to_be_served = int(min_col + 1)
-            	
-            	self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.uav_to_serve)
-            	self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.uav_to_serve)
-            	self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)
+        	if self.ugv_to_be_served == 0:
+        		print("\n No UGV needs serving because our data is: ", self.ugv_seed_level.data)
+        	
+        	else:
+        		shortest_distance = np.min(self.dist_matrix[:, self.ugv_to_be_served - 1])
+        		min_indices = np.argwhere(self.dist_matrix == shortest_distance)
+        		min_row, min_col = min_indices[0]  # Extract row and column indices
+        		self.uav_to_serve = int(min_row + 1)
+        		self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.uav_to_serve)
+        		self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.uav_to_serve)
+        		self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)
             
-            
-            
-            	'''if self.dist_matrix[a][b] < self.close_pair:
-            		#finding the closest UAV-UGV pair and storing the pair's info
-                    	self.close_pair = self.dist_matrix[a][b]
-                    	self.uav_to_serve = a + 1
-                    	self.ugv_to_be_served = b + 1
-
-                    	self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.uav_to_serve)
-                    	self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.uav_to_serve)
-                    	self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)'''
         
         print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served)
         
@@ -309,7 +322,10 @@ class OffboardControl(Node):
         #msg.timestamp = self.timestamp_
         x_offset = -1*(3.15+(self.uav_to_serve - 1)*2.35)
         
-        if self.ugv_to_be_served == 1:
+        if self.ugv_to_be_served == 0:
+        	print("\n No UGV needs serving")
+        
+        elif self.ugv_to_be_served == 1:
         	self.ugvx = self.ugv_pose0.pose.pose.position.y + x_offset
         	self.ugvy = self.ugv_pose0.pose.pose.position.x - 0.15
         	msg.position = [self.ugvx, self.ugvy, -2.0]
@@ -331,7 +347,10 @@ class OffboardControl(Node):
         #msg.timestamp = self.timestamp_
         x_offset = -1*(3.15+(self.uav_to_serve - 1)*2.35)
         
-        if self.ugv_to_be_served == 1:
+        if self.ugv_to_be_served == 0:
+        	print("\n No UGV needs serving")
+        
+        elif self.ugv_to_be_served == 1:
         	msg.position = [-0.002299, -0.0419322, -1.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
@@ -356,17 +375,21 @@ class OffboardControl(Node):
     
     #function to publish velocity command to the UAV    
     def publish_vehicle_command(self, command, param1=0.0, param2=0.0):
-        msg = VehicleCommand()
-        msg.param1 = param1
-        msg.param2 = param2
-        msg.command = command  # command ID
-        msg.target_system = self.uav_to_serve + 1  # system which should execute the command
-        msg.target_component = 1  # component which should execute the command, 0 for all components
-        msg.source_system = 1  # system sending the command
-        msg.source_component = 1  # component sending the command
-        msg.from_external = True
-        msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
-        self.vehicle_command_publisher_.publish(msg)
+    	if self.ugv_seed_level.data == 0:
+    		print("\n No UGV needs serving because our data is: ", self.ugv_seed_level.data)
+    	
+    	else:
+    		msg = VehicleCommand()
+    		msg.param1 = param1
+    		msg.param2 = param2
+    		msg.command = command  # command ID
+    		msg.target_system = self.uav_to_serve + 1  # system which should execute the command
+    		msg.target_component = 1  # component which should execute the command, 0 for all components
+    		msg.source_system = 1  # system sending the command
+    		msg.source_component = 1  # component sending the command
+    		msg.from_external = True
+    		msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
+    		self.vehicle_command_publisher_.publish(msg)
 
 
 
