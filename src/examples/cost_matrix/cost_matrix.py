@@ -95,7 +95,7 @@ class OffboardControl(Node):
         
         self.subscription6 = self.create_subscription(VehicleStatus, "/px4_2/fmu/out/vehicle_status", self.VehicleStatus_callback2, qos_profile_sub)
         
-        self.subscription7 = self.create_subscription(Int16, '/int16_topic', self.seed_level_callback, 1) #subscriber for to the topic that publishes the UGV that needs to be served
+        self.subscription7 = self.create_subscription(Int16, '/int16_topic', self.seed_level_callback, 10) #subscriber for to the topic that publishes the UGV that needs to be served
 
         self.offboard_setpoint_counter_ = 0
 
@@ -175,7 +175,7 @@ class OffboardControl(Node):
         #print("xa:", self.xa, " ya:", self.ya, " za:", self.za)
         #print("xg:", self.xg, " yg:", self.yg, " zg:", self.zg)
         
-        #saving the UGV to be served and UAV to serve position info in variables
+        #saving the UGV to be served and UAV to serve position info in variables. I added -1 because I initialized the uav to serve and ugv to beserved variables to 1 to eliminate an error
         varg_name = "ugv_pose" + str(self.ugv_to_be_served - 1)
         vara_name = "uav_pose" + str(self.uav_to_serve - 1)
         xaa = getattr(self, vara_name).x
@@ -285,6 +285,7 @@ class OffboardControl(Node):
         		min_indices = np.argwhere(self.dist_matrix == shortest_distance)
         		min_row, min_col = min_indices[0]  # Extract row and column indices
         		self.uav_to_serve = int(min_row + 1)
+        		#put a condition here to check whether the chosen uav_to_serve is currently serving (armed), and if so iterate agin to find the best uav to serve and store the index again. you might not need to create topics here 
         		self.offboard_mode_topics = "/px4_{}/fmu/in/offboard_control_mode".format(self.uav_to_serve)
         		self.trajectory_set_point_topics = "/px4_{}/fmu/in/trajectory_setpoint".format(self.uav_to_serve)
         		self.vehicle_command_topics = "/px4_{}/fmu/in/vehicle_command".format(self.uav_to_serve)
@@ -351,13 +352,13 @@ class OffboardControl(Node):
         	print("\n No UGV needs serving")
         
         elif self.ugv_to_be_served == 1:
-        	msg.position = [-0.002299, -0.0419322, -1.0]
+        	msg.position = [-11.0, 11.0, -1.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
 
         elif self.ugv_to_be_served == 2:
-        	msg.position = [-0.022299, -0.0419322, -1.0]
+        	msg.position = [-11.0, 11.0, -1.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)

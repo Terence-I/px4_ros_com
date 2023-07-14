@@ -92,6 +92,21 @@ install(PROGRAMS
   DESTINATION lib/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  src/examples/main_node/main_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  src/examples/uav1_node/uav1_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  src/examples/uav2_node/uav2_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 ############
 # Install ##
 ############
