@@ -24,8 +24,15 @@ from px4_msgs.msg import VehicleCommand
 from px4_msgs.msg import VehicleControlMode
 from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleStatus
+from px4_msgs.msg import BatteryStatus
 
 from std_msgs.msg import Int16
+
+import munkres
+from munkres import Munkres
+from munkres import Munkres, print_matrix
+
+from scipy.optimize import linear_sum_assignment
 
 import math
 import numpy as np
@@ -33,10 +40,10 @@ import time
 
 
 
-class OffboardControl(Node):
+class MainNode(Node):
 
     def __init__(self):
-        super().__init__('OffboardControl')
+        super().__init__('MainNode')
         
         #some variables
         self.ugv_pose0 = None
@@ -46,11 +53,14 @@ class OffboardControl(Node):
         self.uav_pose1 = None
         self.uav_status0 = None #variable for storing UAV1 arming status
         self.uav_status1 = None #variable for storing UAV2 arming status
+        self.battery_status1 = None
+        self.battery_status2 = None
         self.ugv_seed_level = 0 #variable to receive the info of the UGV that needs to be served
-        self.ugvs = 2 #variable to store the number of UGVs
+        self.ugvs = 3 #variable to store the number of UGVs
         self.uavs = 2 #variable to store the number of UAVs
         
-        self.dist_matrix = np.zeros((2, 2), float)
+        self.dist_matrix = np.zeros((self.uavs, self.ugvs), float)
+        self.priority_matrix = np.zeros((self.uavs, self.ugvs), float)
         self.ugv_to_be_served = None #previously initialized to zero. change back if you get relevant errors
         self.uav_to_serve = None
         self.close_pair = 1000
@@ -82,7 +92,7 @@ class OffboardControl(Node):
         self.vehicle_command_topics = None
         
         #variable to store whether a ugv is being served
-        self.ugv_being_served = np.zeros((1,2), bool)
+        self.ugv_being_served = np.zeros((1,self.ugvs), bool)
         
         
         #Qos settings definitions for publishers and subscribers
@@ -101,6 +111,8 @@ class OffboardControl(Node):
         
         self.subscription2 = self.create_subscription(Odometry, '/robot_1/odom_robot_1', self.odometry_callback_one, 1)
         
+        self.subscription10 = self.create_subscription(Odometry, '/robot_2/odom_robot_2', self.odometry_callback_two, 1)
+        
         self.subscription3 = self.create_subscription(VehicleLocalPosition, self.var_name, self.TrajectorySetpoint_callback1, qos_profile_sub)
         
         self.subscription4 = self.create_subscription(VehicleLocalPosition, "/px4_2/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback2, qos_profile_sub)
@@ -108,6 +120,10 @@ class OffboardControl(Node):
         self.subscription5 = self.create_subscription(VehicleStatus, "/px4_1/fmu/out/vehicle_status", self.VehicleStatus_callback1, qos_profile_sub)
         
         self.subscription6 = self.create_subscription(VehicleStatus, "/px4_2/fmu/out/vehicle_status", self.VehicleStatus_callback2, qos_profile_sub)
+        
+        self.subscription8 = self.create_subscription(BatteryStatus, "/px4_1/fmu/out/battery_status", self.BatteryStatus_callback1, qos_profile_sub)
+        
+        self.subscription9 = self.create_subscription(BatteryStatus, "/px4_2/fmu/out/battery_status", self.BatteryStatus_callback2, qos_profile_sub)
         
         self.subscription7 = self.create_subscription(Int16, '/int16_topic', self.seed_level_callback, 10) #subscriber for to the topic that publishes the UGV that needs to be served
         
@@ -128,6 +144,9 @@ class OffboardControl(Node):
     def odometry_callback_one(self, msg):
         self.ugv_pose1 = msg
         
+    def odometry_callback_two(self, msg):
+        self.ugv_pose2 = msg
+    
     def TrajectorySetpoint_callback1(self, msg):
         self.uav_pose0 = msg
         
@@ -142,6 +161,12 @@ class OffboardControl(Node):
     
     def seed_level_callback(self, msg):
         self.ugv_seed_level = msg
+    
+    def BatteryStatus_callback1(self, msg):
+    	self.battery_status1 = msg
+    
+    def BatteryStatus_callback2(self, msg):
+    	self.battery_status2 = msg
     
     #function to convert from quaternion to euler
     def euler_from_quaternion(self, x, y, z, w):
@@ -288,9 +313,9 @@ class OffboardControl(Node):
     def iterate(self):
         
         self.iterate_flag = self.iterate_flag + 1
-        for j in range(0, 2):
-            for i in range(0, 2):
-            	if j == 0 and self.uav_pose0 is not None:
+        for j in range(0, self.uavs):
+            for i in range(0, self.ugvs):
+            	if j == 0 and self.uav_pose0 is not None and self.battery_status1 is not None:
             		#getting UAV position info
                     	self.xa = self.uav_pose0.x + (-3.15)
                     	self.ya = self.uav_pose0.y + 0.34
@@ -308,13 +333,16 @@ class OffboardControl(Node):
 
                     	#calculating the distance
                     	dist = math.sqrt((self.xg-self.xa)**2 + (self.yg-self.ya)**2 + (0.0-0.0)**2)
-                    	self.dist_matrix[j][i] = dist
+                    	batt_level = self.battery_status1.voltage_v - 14.3 # I substract by 14.3 to scale down the battery level
+                    	cost = dist/batt_level
+                    	
+                    	self.dist_matrix[j][i] = cost
                     	#var_value = getattr(self, var_name)
                     	#self.dist_list.append(var_value)
                     	#self.dist_matrix[j][i] = getattr(self, var_name)
             	
             	
-            	elif j == 1 and self.uav_pose1 is not None:
+            	elif j == 1 and self.uav_pose1 is not None and self.battery_status2 is not None:
             		#getting UAV position info
                     	self.xa = self.uav_pose1.x + (-5.5)
                     	self.ya = self.uav_pose1.y + 0.3
@@ -332,7 +360,10 @@ class OffboardControl(Node):
 
                     	#calculating the distance and storing in the matrix
                     	dist = math.sqrt((self.xg-self.xa)**2 + (self.yg-self.ya)**2 + (0.0-0.0)**2)
-                    	self.dist_matrix[j][i] = dist
+                    	batt_level = self.battery_status2.voltage_v - 14.3 # I substract by 14.3 to scale down the battery level
+                    	cost = dist/batt_level
+                    	
+                    	self.dist_matrix[j][i] = cost
             	
             	
             	else:
@@ -343,17 +374,66 @@ class OffboardControl(Node):
         print("\n Cost adjacency matrix:")
         print(self.dist_matrix)
         
+        #transforming the dist_matrix into a priority adjacency matrix
+        m = Munkres() #creating a Munkres object
+        
+        for x in range(0, self.ugvs):
+        	row_ind, col_ind = linear_sum_assignment(self.dist_matrix) #computing the indices with the optimum task assignment combination
+        	
+        	for y in range(self.uavs):
+        		self.dist_matrix[row_ind[y]][col_ind[y]] = 50000
+        		if self.priority_matrix[row_ind[y]][col_ind[y]] == 0:
+        			self.priority_matrix[row_ind[y]][col_ind[y]] = x+1
+        		
+        	
+        for i in range(0, self.uavs):
+        	for j in range(0, self.ugvs):
+        		if self.priority_matrix[i][j] == 0:
+        			self.priority_matrix[i][j] = self.ugvs
+        
+        print('\n the priority adjacency matrix is:', self.priority_matrix)
+        '''for x in range(0, self.ugvs):
+        	indexes = m.compute(self.dist_matrix) #computing the indices with the optimum task assignment combination
+        	print_matrix(self.dist_matrix, msg='Lowest cost through this matrix:')
+        	total = 0
+        	for row, column in indexes:
+        		value = self.dist_matrix[row][column]
+        		total += value #calculating the total cost for the entries with the optimum task assignment combination
+        		self.dist_matrix[row][column] = 200 #assigning a very large cost to the values with an already assigned priority
+        		self.priority_matrix[row][column] = x+1 #assigning the respective priorities to the entries in the priority adjacecny matrix
+        		print(f'({row}, {column}) -> {value}')
+        		print('\n the priority adjacency matrix during computation is:', self.priority_matrix)
+        	print(f'total cost: {total}')
+        	
+        	#assigning the lowest available priority to the last remaining entries
+        	if x == self.ugvs - 1:
+        		for i in range(self.uavs):
+        			for j in range(self.ugvs):
+        				if self.priority_matrix[i][j] == 0:
+        					self.priority_matrix[i][j] = self.ugvs
+        	
+        	print('\n the priority adjacency matrix is:', self.priority_matrix)'''
+        
+        '''#assigning the lowest available priority to the last remaining entries
+        for i in range(self.uavs):
+        	for j in range(self.ugvs):
+        		if self.priority_matrix[i][j] == 0:
+        			self.priority_matrix[i][j] = self.ugvs
+        
+        print('\n the priority adjacency matrix is:', self.priority_matrix)'''
         #loops below are for choosing the pair to be serviced based on how close they are. this is just used to test how the final code will look like, replace with digraph model
         
         
-        for a in range(0, 2):
+        for a in range(0, self.ugvs):
         	if self.ugv_to_be_served == 0:
         		print("\n No UGV needs serving because our data is: 0")
         	
         	else:
-        		shortest_distance = np.min(self.dist_matrix[:, self.ugv_to_be_served - 1])
-        		min_indices = np.argwhere(self.dist_matrix == shortest_distance)
-        		min_row, min_col = min_indices[0]  # Extract row and column indices
+        		min_row = np.argmin(self.priority_matrix[:, self.ugv_to_be_served - 1])
+        		shortest_distance = self.priority_matrix[min_row, self.ugv_to_be_served - 1]
+        		#shortest_distance = np.min(self.dist_matrix[:, self.ugv_to_be_served - 1])
+        		#min_indices = np.argwhere(self.dist_matrix == shortest_distance)
+        		#min_row, min_col = min_indices[0]  # Extract row and column indices
         		#first create this variable chosen_uav = int(min_row + 1)
         		chosen_uav = int(min_row + 1)
         		#then put a condition here: if chosen_uav is not serving (use getattr to access the right topic) then assign to uav_to_serve and publish the ugv_to_be_served to the respective UAV topic
@@ -380,8 +460,8 @@ class OffboardControl(Node):
         		
         		#else if chosen_uav is serving change the corresponding matrix cell to a very high value and iterate again to find the next best uav_to_serve
         		elif self.serving_status == 2:
-        			self.dist_matrix[chosen_uav - 1][self.ugv_to_be_served - 1] = 1000
-        			print("finding another UAV because UAV", chosen_uav, "is currently serving \n")        
+        			#self.priority_matrix[chosen_uav - 1][self.ugv_to_be_served - 1] = 1000
+        			print("\n finding another UAV because UAV", chosen_uav, "is currently serving", self.ugv_to_be_served)        
     
  
 
@@ -390,7 +470,7 @@ class OffboardControl(Node):
 def main(args=None):
     rclpy.init(args=args)
     print("Starting offboard control node...\n")
-    offboard_control = OffboardControl()
+    offboard_control = MainNode()
     
     '''offboard_control.iterate()
     print("Cost adjacency matrix: \n")
