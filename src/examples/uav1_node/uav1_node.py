@@ -23,6 +23,7 @@ from px4_msgs.msg import VehicleLocalPosition
 from px4_msgs.msg import VehicleStatus
 
 from std_msgs.msg import Int16
+from std_msgs.msg import Bool  # Import the standard boolean message type
 
 import math
 import numpy as np
@@ -43,7 +44,9 @@ class Uav1Node(Node):
         self.station_pose = None #variable to store position information of the uav ground station
         self.uav_status0 = None #variable for storing UAV1 arming status
         self.ugv_to_be_served_msg = None #variable to receive the info of the UGV that needs to be served
-        self.ugv_to_be_served = None #previously initialized to zero. change back if you get relevant errors
+        self.ugv_to_be_served = 0 #previously initialized to None. change back if you get relevant errors
+        
+        self.can_serve_flag = True #flag to check whether a UAV received a new service request
         
         
         #variables to receive UGV coordinates
@@ -78,7 +81,7 @@ class Uav1Node(Node):
         
         self.subscription5 = self.create_subscription(VehicleStatus, "/px4_1/fmu/out/vehicle_status", self.VehicleStatus_callback1, qos_profile_sub)
         
-        self.subscription7 = self.create_subscription(Int16, '/serving_uav_topic1', self.ugv_to_be_served_callback, 10) #subscriber to the topic that publishes the UGV that needs to be served
+        self.subscription7 = self.create_subscription(Int16, '/serving_uav_topic1', self.ugv_to_be_served_callback, 0) #subscriber to the topic that publishes the UGV that needs to be served
 
         self.offboard_setpoint_counter_ = 0
 
@@ -102,7 +105,8 @@ class Uav1Node(Node):
         self.uav_status0 = msg
     
     def ugv_to_be_served_callback(self, msg):
-        self.ugv_to_be_served_msg = msg
+    	self.ugv_to_be_served_msg = msg
+    	self.can_serve_flag = True #changing the flag to check whether a UAV received a new service request to true
     
     def odometry_station_callback(self, msg):
         self.station_pose = msg
@@ -120,8 +124,9 @@ class Uav1Node(Node):
         
         if self.ugv_to_be_served_msg is not None:
         	self.ugv_to_be_served = int(self.ugv_to_be_served_msg.data)
-        	print("\n UAV1 going to serve UGV", self.ugv_to_be_served)
-        	if self.ugv_to_be_served != 0:
+        	
+        	if self.ugv_to_be_served != 0 and self.can_serve_flag == True:
+        		print("\n UAV1 going to serve UGV", self.ugv_to_be_served)
         		# Offboard_control_mode needs to be paired with trajectory_setpoint
         		self.arm()
         		self.publish_offboard_control_mode()
@@ -148,6 +153,7 @@ class Uav1Node(Node):
         			time.sleep(10)
         			self.disarm()
         			time.sleep(2)
+        			self.can_serve_flag = False #changing the flag to check whether a UAV received a new service request to false
         
         # stop the counter after reaching 11
         if (self.offboard_setpoint_counter_ < 11):
@@ -226,7 +232,7 @@ class Uav1Node(Node):
     #function to publish velocity command to the UAV    
     def publish_vehicle_command(self, command, param1=0.0, param2=0.0):
     	if self.ugv_to_be_served == 0:
-    		print("\n No UGV needs serving because our data is: ", self.ugv_seed_level.data)
+    		print("\n No UGV needs serving because our data is: ", self.ugv_to_be_served)
     	
     	else:
     		msg = VehicleCommand()

@@ -61,7 +61,7 @@ class MainNode(Node):
         
         self.dist_matrix = np.zeros((self.uavs, self.ugvs), float)
         self.priority_matrix = np.zeros((self.uavs, self.ugvs), float)
-        self.ugv_to_be_served = None #previously initialized to zero. change back if you get relevant errors
+        self.ugv_to_be_served = 0 #previously initialized to zero. change back to zero or None if you get relevant errors
         self.uav_to_serve = None
         self.close_pair = 1000
         self.iterate_flag = 0 #variable to check how many times we have run the iterate method (might not be necessary)
@@ -128,9 +128,9 @@ class MainNode(Node):
         self.subscription7 = self.create_subscription(Int16, '/int16_topic', self.seed_level_callback, 10) #subscriber for to the topic that publishes the UGV that needs to be served
         
         #publishers to publish ugv_to_be_served to the respective chosen uav_to_serve node
-        self.serving_uav_publisher1 = self.create_publisher(Int16, 'serving_uav_topic1', 10)
+        self.serving_uav_publisher1 = self.create_publisher(Int16, 'serving_uav_topic1', 0) #changed the queue size from 10 to 0
         
-        self.serving_uav_publisher2 = self.create_publisher(Int16, 'serving_uav_topic2', 10)
+        self.serving_uav_publisher2 = self.create_publisher(Int16, 'serving_uav_topic2', 0) #changed the queue size from 10 to 0
 
         self.offboard_setpoint_counter_ = 0
 
@@ -291,13 +291,16 @@ class MainNode(Node):
     		self.end_time = time.time()
     		self.duration = self.end_time - self.start_time
     		print("\n The script has been running for", self.duration, "seconds.")
-    		if self.duration >= (10 + (i*20)) and self.duration < (10 + ((i+1)*20)):
+    		
+    		#use self.ugv_being_served.any() == False or self.ugv_being_served.all() == True when needed
+    		if self.duration >= (10 + (i*30)) and self.duration < (10 + ((i+1)*30)):
     			print("\n UGV", i+1, " needs serving.")
     			self.ugv_to_be_served = i+1
-    		elif self.duration < 10 or self.duration >= (10 + ((self.ugvs)*20)):
+    			#self.ugv_being_served[0][self.ugv_to_be_served - 1] == False
+    		elif (self.duration < 10 or self.duration >= (10 + ((self.ugvs)*30))) and self.ugv_being_served.all() == True:
     			self.ugv_to_be_served = 0
     		
-    		if self.duration >= (20 + (self.ugvs*20)):
+    		if self.duration >= (20 + (self.ugvs*30)):
     			self.start_time = time.time()
     			print("\n The script has been running for", self.duration, "seconds.")
     			self.ugv_being_served[:] = False #initializing the ugv being served status to false for all UGVs
@@ -381,9 +384,9 @@ class MainNode(Node):
         	row_ind, col_ind = linear_sum_assignment(self.dist_matrix) #computing the indices with the optimum task assignment combination
         	
         	for y in range(self.uavs):
-        		self.dist_matrix[row_ind[y]][col_ind[y]] = 50000
+        		self.dist_matrix[row_ind[y]][col_ind[y]] = 50000 #assigning a big number to the selected entry
         		if self.priority_matrix[row_ind[y]][col_ind[y]] == 0:
-        			self.priority_matrix[row_ind[y]][col_ind[y]] = x+1
+        			self.priority_matrix[row_ind[y]][col_ind[y]] = x+1 #assigning the respective priorities to the entries in the priority adjacecny matrix
         		
         	
         for i in range(0, self.uavs):
@@ -447,21 +450,28 @@ class MainNode(Node):
         			serving_uav_pub = "serving_uav_publisher" + str(self.uav_to_serve)
         			serve_this_ugv_msg = Int16()
         			serve_this_ugv_msg.data = self.ugv_to_be_served
+        			print("\n the ugv being served status", self.ugv_being_served)
         			getattr(self, serving_uav_pub).publish(serve_this_ugv_msg) #publishing the UGV to be served to the appropriate UAV topic
         			print("UAV", self.uav_to_serve," going to serve UGV", self.ugv_to_be_served)
         			print("\n ugv being served status", self.ugv_being_served)
         			self.ugv_being_served[0][self.ugv_to_be_served - 1] = True #changing the UGV being served status of the ugv_to_be_served to True
-        			print("\n the updated ugv being served status", self.ugv_being_served)
+        			print("\n the updated1 ugv being served status", self.ugv_being_served)
         			break
         		
         		
         		elif self.serving_status == 1 and self.ugv_being_served[0][self.ugv_to_be_served - 1] == True:
         			print("\n uav", chosen_uav, " not going to serve bcz the updated ugv being served status is", self.ugv_being_served)
+ 
+        			#look into this part of the code to fix the flying to a similar UGV twice issue. if this approach fails remember to delete the lines
+        			continue
+        			
+        				
         		
         		#else if chosen_uav is serving change the corresponding matrix cell to a very high value and iterate again to find the next best uav_to_serve
         		elif self.serving_status == 2:
         			#self.priority_matrix[chosen_uav - 1][self.ugv_to_be_served - 1] = 1000
-        			print("\n finding another UAV because UAV", chosen_uav, "is currently serving", self.ugv_to_be_served)        
+        			print("\n finding another UAV because UAV", chosen_uav, "is currently serving UGV", self.ugv_to_be_served)
+        			        
     
  
 
