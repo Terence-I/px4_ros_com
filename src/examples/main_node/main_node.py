@@ -49,15 +49,25 @@ class MainNode(Node):
         self.ugv_pose0 = None
         self.ugv_pose1 = None
         self.ugv_pose2 = None
+        self.ugv_pose3 = None
+        self.ugv_pose4 = None
+        
         self.uav_pose0 = None
         self.uav_pose1 = None
+        self.uav_pose2 = None
+        
         self.uav_status0 = None #variable for storing UAV1 arming status
         self.uav_status1 = None #variable for storing UAV2 arming status
+        self.uav_status2 = None #variable for storing UAV2 arming status
+        
         self.battery_status1 = None
         self.battery_status2 = None
+        self.battery_status3 = None
+        
         self.ugv_seed_level = 0 #variable to receive the info of the UGV that needs to be served
-        self.ugvs = 3 #variable to store the number of UGVs
-        self.uavs = 2 #variable to store the number of UAVs
+        
+        self.ugvs = 4 #variable to store the number of UGVs
+        self.uavs = 3 #variable to store the number of UAVs
         
         self.dist_matrix = np.zeros((self.uavs, self.ugvs), float)
         self.priority_matrix = np.zeros((self.uavs, self.ugvs), float)
@@ -113,17 +123,27 @@ class MainNode(Node):
         
         self.subscription10 = self.create_subscription(Odometry, '/robot_2/odom_robot_2', self.odometry_callback_two, 1)
         
+        self.subscription14 = self.create_subscription(Odometry, '/robot_3/odom_robot_3', self.odometry_callback_three, 1)
+        
+        self.subscription15 = self.create_subscription(Odometry, '/robot_4/odom_robot_4', self.odometry_callback_four, 1)
+        
         self.subscription3 = self.create_subscription(VehicleLocalPosition, self.var_name, self.TrajectorySetpoint_callback1, qos_profile_sub)
         
         self.subscription4 = self.create_subscription(VehicleLocalPosition, "/px4_2/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback2, qos_profile_sub)
+        
+        self.subscription11 = self.create_subscription(VehicleLocalPosition, "/px4_3/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback3, qos_profile_sub)
         
         self.subscription5 = self.create_subscription(VehicleStatus, "/px4_1/fmu/out/vehicle_status", self.VehicleStatus_callback1, qos_profile_sub)
         
         self.subscription6 = self.create_subscription(VehicleStatus, "/px4_2/fmu/out/vehicle_status", self.VehicleStatus_callback2, qos_profile_sub)
         
+        self.subscription12 = self.create_subscription(VehicleStatus, "/px4_3/fmu/out/vehicle_status", self.VehicleStatus_callback3, qos_profile_sub)
+        
         self.subscription8 = self.create_subscription(BatteryStatus, "/px4_1/fmu/out/battery_status", self.BatteryStatus_callback1, qos_profile_sub)
         
         self.subscription9 = self.create_subscription(BatteryStatus, "/px4_2/fmu/out/battery_status", self.BatteryStatus_callback2, qos_profile_sub)
+        
+        self.subscription13 = self.create_subscription(BatteryStatus, "/px4_3/fmu/out/battery_status", self.BatteryStatus_callback3, qos_profile_sub)
         
         self.subscription7 = self.create_subscription(Int16, '/int16_topic', self.seed_level_callback, 10) #subscriber for to the topic that publishes the UGV that needs to be served
         
@@ -131,6 +151,8 @@ class MainNode(Node):
         self.serving_uav_publisher1 = self.create_publisher(Int16, 'serving_uav_topic1', 0) #changed the queue size from 10 to 0
         
         self.serving_uav_publisher2 = self.create_publisher(Int16, 'serving_uav_topic2', 0) #changed the queue size from 10 to 0
+        
+        self.serving_uav_publisher3 = self.create_publisher(Int16, 'serving_uav_topic3', 0) #changed the queue size from 10 to 0
 
         self.offboard_setpoint_counter_ = 0
 
@@ -147,17 +169,29 @@ class MainNode(Node):
     def odometry_callback_two(self, msg):
         self.ugv_pose2 = msg
     
+    def odometry_callback_three(self, msg):
+        self.ugv_pose3 = msg
+    
+    def odometry_callback_four(self, msg):
+        self.ugv_pose4 = msg
+    
     def TrajectorySetpoint_callback1(self, msg):
         self.uav_pose0 = msg
         
     def TrajectorySetpoint_callback2(self, msg):
         self.uav_pose1 = msg
     
+    def TrajectorySetpoint_callback3(self, msg):
+        self.uav_pose2 = msg
+    
     def VehicleStatus_callback1(self, msg):
         self.uav_status0 = msg
     
     def VehicleStatus_callback2(self, msg):
         self.uav_status1 = msg
+    
+    def VehicleStatus_callback3(self, msg):
+        self.uav_status2 = msg
     
     def seed_level_callback(self, msg):
         self.ugv_seed_level = msg
@@ -167,6 +201,9 @@ class MainNode(Node):
     
     def BatteryStatus_callback2(self, msg):
     	self.battery_status2 = msg
+    
+    def BatteryStatus_callback3(self, msg):
+    	self.battery_status3 = msg
     
     #function to convert from quaternion to euler
     def euler_from_quaternion(self, x, y, z, w):
@@ -224,7 +261,7 @@ class MainNode(Node):
     		roll, pitch, yaw = self.euler_from_quaternion(self.quaternion.x, self.quaternion.y, self.quaternion.z, self.quaternion.w)
     		
     		#condition to turn at the end of the row
-    		if self.ugv_position.x >= 5.0:
+    		if self.ugv_position.x >= 22.0:
     			if yaw <= 3.14:
     				msg.linear.x = 0.02
     				msg.linear.y = 0.0
@@ -246,7 +283,7 @@ class MainNode(Node):
     		
     		
     		#condition to turn at the end of the row
-    		elif self.ugv_position.x <= -5.0:
+    		elif self.ugv_position.x <= 9.0:
     			if yaw >= 0.0:
     				msg.linear.x = 0.02
     				msg.linear.y = 0.0

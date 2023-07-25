@@ -78,9 +78,15 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
+  src/examples/offboard_py1/offboard_control1.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
   src/examples/fly_to_ugv/fly_to_ugv.py
   DESTINATION lib/${PROJECT_NAME}
 )
+
 
 install(PROGRAMS
   src/examples/cost_matrix/cost_matrix.py
@@ -104,6 +110,11 @@ install(PROGRAMS
 
 install(PROGRAMS
   src/examples/uav2_node/uav2_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
+install(PROGRAMS
+  src/examples/uav3_node/uav3_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

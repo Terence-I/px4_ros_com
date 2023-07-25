@@ -30,10 +30,10 @@ import time
 
 
 
-class Uav2Node(Node):
+class Uav3Node(Node):
 
     def __init__(self):
-        super().__init__('Uav2Node')
+        super().__init__('Uav3Node')
         
         #some variables
         self.ugv_pose0 = None
@@ -63,10 +63,10 @@ class Uav2Node(Node):
         qos_profile_pub = QoSProfile(reliability=ReliabilityPolicy.BEST_EFFORT, durability=DurabilityPolicy.TRANSIENT_LOCAL, history=HistoryPolicy.KEEP_LAST, depth=0)
         
         self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
-                                                                        "/px4_2/fmu/in/offboard_control_mode", 1)
+                                                                        "/px4_3/fmu/in/offboard_control_mode", 1)
         self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
-                                                                    "/px4_2/fmu/in/trajectory_setpoint", 1)
-        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_2/fmu/in/vehicle_command", 1)
+                                                                    "/px4_3/fmu/in/trajectory_setpoint", 1)
+        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_3/fmu/in/vehicle_command", 1)
         
         #subscribers to the UGVs and UAVs position and status topics
         self.subscription1 = self.create_subscription(Odometry, '/robot_0/odom_robot_0', self.odometry_callback, 1)
@@ -81,11 +81,11 @@ class Uav2Node(Node):
         
         self.subscription6 = self.create_subscription(Odometry, '/uav_station/odom_uav_station', self.odometry_station_callback, 1)
         
-        self.subscription3 = self.create_subscription(VehicleLocalPosition, "/px4_2/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback1, qos_profile_sub)
+        self.subscription3 = self.create_subscription(VehicleLocalPosition, "/px4_3/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback1, qos_profile_sub)
         
-        self.subscription5 = self.create_subscription(VehicleStatus, "/px4_2/fmu/out/vehicle_status", self.VehicleStatus_callback1, qos_profile_sub)
+        self.subscription5 = self.create_subscription(VehicleStatus, "/px4_3/fmu/out/vehicle_status", self.VehicleStatus_callback1, qos_profile_sub)
         
-        self.subscription7 = self.create_subscription(Int16, '/serving_uav_topic2', self.ugv_to_be_served_callback, 0) #subscriber to the topic that publishes the UGV that needs to be served
+        self.subscription7 = self.create_subscription(Int16, '/serving_uav_topic3', self.ugv_to_be_served_callback, 0) #subscriber to the topic that publishes the UGV that needs to be served
 
         self.offboard_setpoint_counter_ = 0
 
@@ -137,7 +137,7 @@ class Uav2Node(Node):
         	self.ugv_to_be_served = int(self.ugv_to_be_served_msg.data)
         	
         	if self.ugv_to_be_served != 0 and self.can_serve_flag == True:
-        		print("\n UAV2 going to serve UGV", self.ugv_to_be_served)
+        		print("\n UAV3 going to serve UGV", self.ugv_to_be_served)
         		# Offboard_control_mode needs to be paired with trajectory_setpoint
         		self.arm()
         		self.publish_offboard_control_mode()
@@ -155,7 +155,7 @@ class Uav2Node(Node):
         		
         		#condition for the UAV to fly back to the ground station after refilling
         		
-        		if abs(ygg - yaa)<=0.35 and round(zaa, 0) == -2.0:
+        		if abs(ygg - yaa)<=0.35 and round(zaa, 0) == -3.0:
         			#self.publish_trajectory_setpoint()
         			#self.publish_trajectory_setpoint()
         			#self.refill()
@@ -203,9 +203,9 @@ class Uav2Node(Node):
         msg = TrajectorySetpoint()
         #msg.timestamp = self.timestamp_
         self.ugv_to_be_served = int(self.ugv_to_be_served_msg.data)
-        x_offset = -1*(5.5)
+        x_offset = -1*(8.37)
         
-        print("\n UAV2 going to serve UGV", self.ugv_to_be_served)
+        print("\n UAV3 going to serve UGV", self.ugv_to_be_served)
         
         if self.ugv_to_be_served == 0:
         	print("\n No UGV needs serving")
@@ -214,7 +214,7 @@ class Uav2Node(Node):
         	ugv_name = "ugv_pose" + str(self.ugv_to_be_served - 1)
         	self.ugvx = getattr(self, ugv_name).pose.pose.position.y + x_offset
         	self.ugvy = getattr(self, ugv_name).pose.pose.position.x - 0.15
-        	msg.position = [self.ugvx, self.ugvy, -2.0]
+        	msg.position = [self.ugvx, self.ugvy, -3.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
@@ -224,7 +224,7 @@ class Uav2Node(Node):
         msg = TrajectorySetpoint()
         #msg.timestamp = self.timestamp_
         self.ugv_to_be_served = int(self.ugv_to_be_served_msg.data)
-        x_offset = -1*(5.5)
+        x_offset = -1*(8.37)
         
         if self.ugv_to_be_served == 0:
         	print("\n No UGV needs serving")
@@ -250,7 +250,7 @@ class Uav2Node(Node):
     		msg.param1 = param1
     		msg.param2 = param2
     		msg.command = command  # command ID
-    		msg.target_system = 3  # system which should execute the command
+    		msg.target_system = 4  # system which should execute the command
     		msg.target_component = 1  # component which should execute the command, 0 for all components
     		msg.source_system = 1  # system sending the command
     		msg.source_component = 1  # component sending the command
@@ -265,7 +265,7 @@ class Uav2Node(Node):
 def main(args=None):
     rclpy.init(args=args)
     print("Starting offboard control node...\n")
-    offboard_control = Uav2Node()
+    offboard_control = Uav3Node()
     
     '''offboard_control.iterate()
     print("Cost adjacency matrix: \n")

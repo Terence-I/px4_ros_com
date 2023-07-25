@@ -28,10 +28,10 @@ class OffboardControl(Node):
         self.current_pose = None
         
         self.offboard_control_mode_publisher_ = self.create_publisher(OffboardControlMode,
-                                                                        "/px4_2/fmu/in/offboard_control_mode", 10)
+                                                                        "/px4_3/fmu/in/offboard_control_mode", 10)
         self.trajectory_setpoint_publisher_ = self.create_publisher(TrajectorySetpoint,
-                                                                    "/px4_2/fmu/in/trajectory_setpoint", 10)
-        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_2/fmu/in/vehicle_command", 10)
+                                                                    "/px4_3/fmu/in/trajectory_setpoint", 10)
+        self.vehicle_command_publisher_ = self.create_publisher(VehicleCommand, "/px4_3/fmu/in/vehicle_command", 10)
         
         self.subscription = self.create_subscription(Odometry, '/robot/odom_robot', self.odometry_callback, 10)
         
@@ -104,7 +104,7 @@ class OffboardControl(Node):
     def publish_trajectory_setpoint(self):
         msg = TrajectorySetpoint()
         #msg.timestamp = self.timestamp_
-        msg.position = [0.0, 31.0, -2.0] 
+        msg.position = [3.0, 32.0, -2.0] 
         msg.yaw = 3.14  # [-PI:PI]
         msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         self.trajectory_setpoint_publisher_.publish(msg)
@@ -134,7 +134,7 @@ class OffboardControl(Node):
         msg.param1 = param1
         msg.param2 = param2
         msg.command = command  # command ID
-        msg.target_system = 3  # system which should execute the command
+        msg.target_system = 4  # system which should execute the command
         msg.target_component = 1  # component which should execute the command, 0 for all components
         msg.source_system = 1  # system sending the command
         msg.source_component = 1  # component sending the command

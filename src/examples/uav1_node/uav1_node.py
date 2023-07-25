@@ -40,6 +40,10 @@ class Uav1Node(Node):
         self.ugv_pose0 = None
         self.ugv_pose1 = None
         self.ugv_pose2 = None
+        self.ugv_pose3 = None
+        self.ugv_pose4 = None
+        
+        
         self.uav_pose0 = None
         self.station_pose = None #variable to store position information of the uav ground station
         self.uav_status0 = None #variable for storing UAV1 arming status
@@ -75,6 +79,10 @@ class Uav1Node(Node):
         
         self.subscription4 = self.create_subscription(Odometry, '/robot_2/odom_robot_2', self.odometry_callback_two, 1)
         
+        self.subscription8 = self.create_subscription(Odometry, '/robot_3/odom_robot_3', self.odometry_callback_three, 1)
+        
+        self.subscription9 = self.create_subscription(Odometry, '/robot_4/odom_robot_4', self.odometry_callback_four, 1)
+        
         self.subscription6 = self.create_subscription(Odometry, '/uav_station/odom_uav_station', self.odometry_station_callback, 1)
         
         self.subscription3 = self.create_subscription(VehicleLocalPosition, "/px4_1/fmu/out/vehicle_local_position", self.TrajectorySetpoint_callback1, qos_profile_sub)
@@ -97,6 +105,12 @@ class Uav1Node(Node):
         
     def odometry_callback_two(self, msg):
         self.ugv_pose2 = msg
+    
+    def odometry_callback_three(self, msg):
+        self.ugv_pose3 = msg
+    
+    def odometry_callback_four(self, msg):
+        self.ugv_pose4 = msg
     
     def TrajectorySetpoint_callback1(self, msg):
         self.uav_pose0 = msg
@@ -144,7 +158,7 @@ class Uav1Node(Node):
         		
         		#condition for the UAV to fly back to the ground station after refilling
         		
-        		if abs(self.ygg - yaa)<=0.35 and round(zaa, 0) == -2.0:
+        		if abs(self.ygg - yaa)<=0.35 and round(zaa, 0) == -3.0:
         			#self.publish_trajectory_setpoint()
         			#self.publish_trajectory_setpoint()
         			#self.refill()
@@ -203,7 +217,7 @@ class Uav1Node(Node):
         	ugv_name = "ugv_pose" + str(self.ugv_to_be_served - 1)
         	self.ugvx = getattr(self, ugv_name).pose.pose.position.y + x_offset
         	self.ugvy = getattr(self, ugv_name).pose.pose.position.x - 0.15
-        	msg.position = [self.ugvx, self.ugvy, -2.0]
+        	msg.position = [self.ugvx, self.ugvy, -3.0]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
@@ -219,7 +233,7 @@ class Uav1Node(Node):
         	print("\n No UGV needs serving")
         
         else:
-        	msg.position = [(self.station_pose.pose.pose.position.y) + x_offset, self.station_pose.pose.pose.position.x + 2.0, -1.5]
+        	msg.position = [(self.station_pose.pose.pose.position.y) - x_offset, self.station_pose.pose.pose.position.x + 2.0, -1.5]
         	msg.yaw = -3.14  # [-PI:PI]
         	msg.timestamp = int(Clock().now().nanoseconds / 1000) # time in microseconds
         	self.trajectory_setpoint_publisher_.publish(msg)
