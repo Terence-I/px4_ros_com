@@ -37,6 +37,7 @@ from scipy.optimize import linear_sum_assignment
 import math
 import numpy as np
 import time
+import csv
 
 
 
@@ -66,8 +67,8 @@ class MainNode(Node):
         
         self.ugv_seed_level = 0 #variable to receive the info of the UGV that needs to be served
         
-        self.ugvs = 4 #variable to store the number of UGVs
-        self.uavs = 3 #variable to store the number of UAVs
+        self.ugvs = 3 #variable to store the number of UGVs
+        self.uavs = 2 #variable to store the number of UAVs
         
         self.dist_matrix = np.zeros((self.uavs, self.ugvs), float)
         self.priority_matrix = np.zeros((self.uavs, self.ugvs), float)
@@ -103,6 +104,15 @@ class MainNode(Node):
         
         #variable to store whether a ugv is being served
         self.ugv_being_served = np.zeros((1,self.ugvs), bool)
+        
+        #list to save the serving iterations and sequence
+        self.serving_sequence_list = [
+        ["Iteration number"],
+        ["serving pair"],
+        ]
+        
+        self.iteration_number = 0 #variable to store the current number of serving iteration
+        self.ugv_to_be_served_on_current_iteration = 0 #variable to act as flag for checking whether ugv_to_be_served has changed
         
         
         #Qos settings definitions for publishers and subscribers
@@ -273,7 +283,7 @@ class MainNode(Node):
     			
     			
     			else:
-    				msg.linear.x = 0.35
+    				msg.linear.x = 0.5
     				msg.linear.y = 0.0
     				msg.linear.z = 0.0
     				
@@ -294,7 +304,7 @@ class MainNode(Node):
     				msg.angular.z = -2.0
     			
     			else:
-        			msg.linear.x = 0.35
+        			msg.linear.x = 0.5
         			msg.linear.y = 0.0
         			msg.linear.z = 0.0
         		
@@ -469,7 +479,7 @@ class MainNode(Node):
         		print("\n No UGV needs serving because our data is: 0")
         	
         	else:
-        		min_row = np.argmin(self.priority_matrix[:, self.ugv_to_be_served - 1])
+        		min_row = np.argmin(self.priority_matrix[:, self.ugv_to_be_served - 1]) #find the smallest priority value in the priority matrix from the ugv_to_served column
         		shortest_distance = self.priority_matrix[min_row, self.ugv_to_be_served - 1]
         		#shortest_distance = np.min(self.dist_matrix[:, self.ugv_to_be_served - 1])
         		#min_indices = np.argwhere(self.dist_matrix == shortest_distance)
@@ -493,6 +503,35 @@ class MainNode(Node):
         			print("\n ugv being served status", self.ugv_being_served)
         			self.ugv_being_served[0][self.ugv_to_be_served - 1] = True #changing the UGV being served status of the ugv_to_be_served to True
         			print("\n the updated1 ugv being served status", self.ugv_being_served)
+        			
+        			#condition to store the serving sequences in a csv file
+        			if self.ugv_to_be_served_on_current_iteration != self.ugv_to_be_served:
+        				#update the variables
+        				self.ugv_to_be_served_on_current_iteration = self.ugv_to_be_served
+        				self.iteration_number = self.iteration_number + 1
+        				
+        				#varibles to store in the csv file and their respective list indices
+        				new_iteration = str(self.iteration_number)
+        				iteration_row_index = 0
+        				new_serving_pair = "UAV{} going to serve UGV{}".format(chosen_uav, self.ugv_to_be_served)
+        				serving_pair_row_index = 1
+        				
+        				# Append the new values to the specified rows
+        				self.serving_sequence_list[iteration_row_index].append(new_iteration)
+        				self.serving_sequence_list[serving_pair_row_index].append(new_serving_pair)
+        				
+        				# Transpose the list to switch rows and columns
+        				transposed_list = list(map(list, zip(*self.serving_sequence_list)))
+        				print("\n Transposed serving sequence list: ", transposed_list)
+        				
+        				file_path = 'string_list.csv'
+        				
+        				# Open the file for writing
+        				with open(file_path, 'w', newline='') as file:
+        					writer = csv.writer(file)
+        					# Write the transposed data to the CSV file
+        					for row in transposed_list:
+        						writer.writerow(row)
         			break
         		
         		
@@ -507,7 +546,7 @@ class MainNode(Node):
         		#else if chosen_uav is serving change the corresponding matrix cell to a very high value and iterate again to find the next best uav_to_serve
         		elif self.serving_status == 2:
         			#self.priority_matrix[chosen_uav - 1][self.ugv_to_be_served - 1] = 1000
-        			print("\n finding another UAV because UAV", chosen_uav, "is currently serving UGV", self.ugv_to_be_served)
+        			print("\n finding another UAV because UAV", chosen_uav, "is currently serving")
         			        
     
  

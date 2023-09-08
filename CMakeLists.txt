@@ -64,6 +64,7 @@ add_executable(offboard_control src/examples/offboard/offboard_control.cpp)
 ament_target_dependencies(offboard_control rclcpp px4_msgs)
 install(TARGETS offboard_control DESTINATION lib/${PROJECT_NAME})
 
+
 # examples/offboard_py/offboard_control
 #add_executable(offboard_control_py src/examples/offboard_py/offboard_control.py)
 #ament_target_dependencies(offboard_control_py rclpy px4_msgs)
@@ -78,7 +79,7 @@ install(PROGRAMS
 )
 
 install(PROGRAMS
-  src/examples/offboard_py1/offboard_control1.py
+  src/examples/offboard_py1/offboard_py1.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
